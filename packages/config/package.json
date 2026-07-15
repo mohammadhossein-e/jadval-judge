@@ -1,0 +1,7 @@
+{
+  "name": "@jadval/config",
+  "version": "0.1.0",
+  "description": "Shared configuration for Jadval packages",
+  "private": true,
+  "files": []
+}

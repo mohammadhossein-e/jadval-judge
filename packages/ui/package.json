@@ -1,0 +1,7 @@
+{
+  "name": "@jadval/ui",
+  "version": "0.1.0",
+  "description": "Shared UI components for Jadval applications",
+  "private": true,
+  "files": []
+}

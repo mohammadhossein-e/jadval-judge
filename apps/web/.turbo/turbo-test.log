@@ -1,0 +1,141 @@
+
+> @jadval/web@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /Users/mhe/Desktop/jadval-judge/apps/web
+
+ ✓ lib/__tests__/draw.test.ts  (24 tests) 7ms
+ ✓ hooks/__tests__/useManualDraw.test.ts  (20 tests) 26ms
+ ❯ hooks/__tests__/useMatchResolution.test.ts  (19 tests | 6 failed) 28ms
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > advances winner to next match
+     → expected undefined to be 'c3' // Object.is equality
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > sets winner on the match
+     → expected undefined to be 'c1' // Object.is equality
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > can resolve the final match
+     → Cannot read properties of null (reading 'id')
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > undoMatch > cascades undo to subsequent matches
+     → expected undefined to be 'c2' // Object.is equality
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > canUndoMatch > returns true for resolved non-bye match
+     → expected false to be true // Object.is equality
+   ❯ hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > bracket update on source change > resets state when sourceBracket changes
+     → expected null not to be null
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > advances winner to next match
+AssertionError: expected undefined to be 'c3' // Object.is equality
+
+- Expected: 
+"c3"
+
++ Received: 
+undefined
+
+ ❯ hooks/__tests__/useMatchResolution.test.ts:48:37
+     46| 
+     47|       const next = result.current.bracket.matches.find((m) => m.id ===…
+     48|       expect(next?.competitorA?.id).toBe(winnerId);
+       |                                     ^
+     49|     });
+     50| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > sets winner on the match
+AssertionError: expected undefined to be 'c1' // Object.is equality
+
+- Expected: 
+"c1"
+
++ Received: 
+undefined
+
+ ❯ hooks/__tests__/useMatchResolution.test.ts:62:36
+     60| 
+     61|       const resolved = result.current.bracket.matches.find((m) => m.id…
+     62|       expect(resolved?.winner?.id).toBe(winnerId);
+       |                                    ^
+     63|     });
+     64| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > resolveWinner > can resolve the final match
+TypeError: Cannot read properties of null (reading 'id')
+ ❯ hooks/__tests__/useMatchResolution.test.ts:83:77
+     81|       )!;
+     82|       act(() => {
+     83|         result.current.resolveWinner(finalMatch.id, finalMatch.competi…
+       |                                                                             ^
+     84|       });
+     85| 
+ ❯ ../../node_modules/@testing-library/react/dist/act-compat.js:47:24
+ ❯ process.env.NODE_ENV.exports.act ../../node_modules/react/cjs/react.development.js:814:22
+ ❯ Proxy.<anonymous> ../../node_modules/@testing-library/react/dist/act-compat.js:46:25
+ ❯ hooks/__tests__/useMatchResolution.test.ts:82:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > undoMatch > cascades undo to subsequent matches
+AssertionError: expected undefined to be 'c2' // Object.is equality
+
+- Expected: 
+"c2"
+
++ Received: 
+undefined
+
+ ❯ hooks/__tests__/useMatchResolution.test.ts:120:37
+    118| 
+    119|       const next = result.current.bracket.matches.find((m) => m.id ===…
+    120|       expect(next?.competitorA?.id).toBe(winnerId);
+       |                                     ^
+    121| 
+    122|       act(() => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > canUndoMatch > returns true for resolved non-bye match
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ hooks/__tests__/useMatchResolution.test.ts:189:53
+    187|       });
+    188| 
+    189|       expect(result.current.canUndoMatch(match.id)).toBe(true);
+       |                                                     ^
+    190|     });
+    191| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  hooks/__tests__/useMatchResolution.test.ts > useMatchResolution > bracket update on source change > resets state when sourceBracket changes
+AssertionError: expected null not to be null
+ ❯ hooks/__tests__/useMatchResolution.test.ts:229:90
+    227|       });
+    228| 
+    229|       expect(result.current.bracket.matches.find((m) => m.id === match…
+       |                                                                                          ^
+    230| 
+    231|       const { bracket: bracket2 } = generateBracket(makeCompetitors(4)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  6 failed | 57 passed (63)
+   Start at  15:36:57
+   Duration  951ms (transform 153ms, setup 0ms, collect 351ms, tests 61ms, environment 1.07s, prepare 408ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mhe/Desktop/jadval-judge/apps/web
+npm error workspace @jadval/web@0.1.0
+npm error location /Users/mhe/Desktop/jadval-judge/apps/web
+npm error command failed
+npm error command sh -c vitest run

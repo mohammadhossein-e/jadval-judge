@@ -1,0 +1,6 @@
+{
+  "name": "@jadval/admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Admin dashboard for Jadval tournament platform"
+}

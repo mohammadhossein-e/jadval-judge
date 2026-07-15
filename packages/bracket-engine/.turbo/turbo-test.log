@@ -1,0 +1,19 @@
+
+> @jadval/bracket-engine@0.1.0 test
+> vitest run
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v1.6.1 /Users/mhe/Desktop/jadval-judge/packages/bracket-engine
+
+ ✓ __tests__/single-elimination/byes.test.ts  (8 tests) 6ms
+ ✓ __tests__/single-elimination/seeding.test.ts  (16 tests) 13ms
+ ✓ __tests__/single-elimination/advancement.test.ts  (10 tests) 11ms
+ ✓ __tests__/single-elimination/generator.test.ts  (24 tests) 28ms
+ ✓ __tests__/single-elimination/cascade.test.ts  (7 tests) 42ms
+
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+   Start at  15:36:57
+   Duration  556ms (transform 162ms, setup 1ms, collect 382ms, tests 100ms, environment 1ms, prepare 560ms)
+

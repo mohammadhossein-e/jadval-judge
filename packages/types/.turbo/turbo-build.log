@@ -1,0 +1,86 @@
+
+> @jadval/types@0.1.0 build
+> tsup src/index.ts --format esm,cjs --dts
+
+CLI Building entry: src/index.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Target: es2020
+ESM Build start
+CJS Build start
+
+ WARN  [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe condition "types" here will never be used as it comes after both "import" and "require"[0m [package.json]
+
+    package.json:12:6:
+[37m      12 │       [32m"types"[37m: "./dist/index.d.ts"
+         ╵       [32m~~~~~~~[0m
+
+  The "import" condition comes earlier and will be used for all "import" statements:
+
+    package.json:10:6:
+[37m      10 │       [32m"import"[37m: "./dist/index.mjs",
+         ╵       [32m~~~~~~~~[0m
+
+  The "require" condition comes earlier and will be used for all "require" calls:
+
+    package.json:11:6:
+[37m      11 │       [32m"require"[37m: "./dist/index.js",
+         ╵       [32m~~~~~~~~~[0m
+
+
+
+
+ WARN  [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe condition "types" here will never be used as it comes after both "import" and "require"[0m [package.json]
+
+    package.json:12:6:
+[37m      12 │       [32m"types"[37m: "./dist/index.d.ts"
+         ╵       [32m~~~~~~~[0m
+
+  The "import" condition comes earlier and will be used for all "import" statements:
+
+    package.json:10:6:
+[37m      10 │       [32m"import"[37m: "./dist/index.mjs",
+         ╵       [32m~~~~~~~~[0m
+
+  The "require" condition comes earlier and will be used for all "require" calls:
+
+    package.json:11:6:
+[37m      11 │       [32m"require"[37m: "./dist/index.js",
+         ╵       [32m~~~~~~~~~[0m
+
+
+
+ESM dist/index.mjs 0 B
+ESM ⚡️ Build success in 82ms
+CJS dist/index.js 758.00 B
+CJS ⚡️ Build success in 83ms
+DTS Build start
+src/index.ts(1,33): error TS6307: File '/Users/mhe/Desktop/jadval-judge/packages/types/src/tournament.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.
+src/index.ts(2,57): error TS6307: File '/Users/mhe/Desktop/jadval-judge/packages/types/src/division.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './division' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/index.ts'
+    Imported via './division' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/bracket.ts'
+src/index.ts(3,33): error TS6307: File '/Users/mhe/Desktop/jadval-judge/packages/types/src/competitor.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './competitor' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/index.ts'
+    Imported via './competitor' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/bracket.ts'
+src/index.ts(4,39): error TS6307: File '/Users/mhe/Desktop/jadval-judge/packages/types/src/match.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './match' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/index.ts'
+    Imported via './match' from file '/Users/mhe/Desktop/jadval-judge/packages/types/src/bracket.ts'
+src/index.ts(5,50): error TS6307: File '/Users/mhe/Desktop/jadval-judge/packages/types/src/bracket.ts' is not listed within the file list of project ''. Projects must list all files or use an 'include' pattern.
+
+Error: error occurred in dts build
+    at Worker.<anonymous> (/Users/mhe/Desktop/jadval-judge/packages/types/node_modules/tsup/dist/index.js:1545:26)
+    at Worker.emit (node:events:508:28)
+    at MessagePort.<anonymous> (node:internal/worker:331:53)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:845:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)
+DTS Build error
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/mhe/Desktop/jadval-judge/packages/types
+npm error workspace @jadval/types@0.1.0
+npm error location /Users/mhe/Desktop/jadval-judge/packages/types
+npm error command failed
+npm error command sh -c tsup src/index.ts --format esm,cjs --dts

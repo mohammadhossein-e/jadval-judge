@@ -1,0 +1,7 @@
+{
+  "name": "@jadval/db",
+  "version": "0.1.0",
+  "description": "Database schema and Supabase client for Jadval",
+  "private": true,
+  "files": []
+}
