@@ -322,22 +322,19 @@ RootLayout
     │   │   ├── BracketPreview (shows BYE count before generation)
     │   │   └── GenerateBracketButton
     │   │
-    │   └── BracketPage
-    │       ├── BracketHeader
-    │       ├── BracketView (interactive)
-    │       │   ├── BracketRound[] (column per round)
-    │       │   │   └── BracketMatch[]
-    │       │   │       ├── MatchSlot (competitor A or BYE)
-    │       │   │       ├── MatchSlot (competitor B or BYE)
-    │       │   │       └── MatchConnector (line to next round)
-    │       │   └── ChampionDisplay
-    │       ├── MatchDetailPanel (slide-over on match click)
-    │       │   ├── CompetitorInfo (A)
-    │       │   ├── CompetitorInfo (B)
-    │       │   └── SelectWinnerButton[]
-    │       └── BracketActions
-    │           ├── ResetBracketButton
-    │           └── ShareBracketButton
+    │   └── BracketPage (routing + loading only)
+    │       └── BracketContainer (data orchestration)
+    │           ├── useBracketData hook
+    │           ├── useBracketActions hook
+    │           ├── BracketHeader (generic, composable)
+    │           ├── BracketView (interactive)
+    │           │   ├── BracketRound[] (column per round)
+    │           │   │   └── BracketMatch[]
+    │           │   │       ├── MatchSlot (competitor A or BYE)
+    │           │   │       ├── MatchSlot (competitor B or BYE)
+    │           │   │       └── MatchConnector (line to next round)
+    │           │   └── ChampionDisplay
+    │           └── BracketActions (composable, injected per view mode)
     │
     └── [Shared Components]
         ├── PinDialog (modal for PIN entry)
@@ -349,7 +346,159 @@ RootLayout
 
 ---
 
-## 6. State Management Strategy
+## 6. Bracket UI Architecture (Sprint 1)
+
+### 6.1 Container/Presentation Pattern
+
+The BracketPage follows a strict separation of concerns:
+
+```
+BracketPage (routing + loading)
+    ↓
+BracketContainer (data orchestration)
+    ↓
+Hooks (useBracketData, useBracketActions)
+    ↓
+Presentation Components (pure, composable)
+```
+
+**BracketPage** responsibilities:
+- Route parameters extraction (`tournamentId`, `categoryId`)
+- Loading states and error boundaries
+- Server-side data fetching (initial bracket load)
+- Renders `BracketContainer` with required props
+
+**BracketContainer** responsibilities:
+- Data orchestration via hooks
+- State management (selected match, optimistic updates)
+- Real-time subscription setup
+- Action handlers (generate, resolve, undo, share)
+- Renders presentation components with props + callbacks
+
+### 6.2 Presentation Components
+
+#### BracketHeader (Generic, Composable)
+
+A flexible header component that accepts composable slots:
+
+```typescript
+interface BracketHeaderProps {
+  tournamentName: string
+  categoryName: string
+  // Composable slots (all optional)
+  status?: React.ReactNode      // Category status badge
+  currentRound?: React.ReactNode // Round indicator
+  liveIndicator?: React.ReactNode // Live/realtime indicator
+  tatami?: string               // Tatami/court assignment
+  actions?: React.ReactNode     // Header actions (export, share)
+}
+```
+
+#### BracketToolbar (Pure Presentation)
+
+A toolbar that emits events, never executes actions:
+
+```typescript
+interface BracketToolbarProps {
+  // State
+  canGenerate: boolean
+  canUndo: boolean
+  canShare: boolean
+  isLive: boolean
+  // Event handlers (all callbacks)
+  onGenerateRequested: () => void
+  onUndoRequested: () => void
+  onShareRequested: () => void
+  onExportRequested?: () => void
+}
+```
+
+**Key principle**: The toolbar never calls APIs or modifies state directly. It only signals intent via callbacks.
+
+### 6.3 Composable Actions Architecture
+
+Instead of a global `readOnly` mode, actions are injected per view context:
+
+```typescript
+// Actions are React nodes that can be composed/omitted
+interface BracketActionsProps {
+  primary?: React.ReactNode    // Main action (e.g., Select Winner)
+  secondary?: React.ReactNode  // Secondary actions (e.g., Share, Export)
+  danger?: React.ReactNode     // Destructive actions (e.g., Reset)
+}
+
+// View modes compose different action sets
+const organizerActions = {
+  primary: <SelectWinnerButton />,
+  secondary: <><ShareButton /><ExportButton /></>,
+  danger: <ResetButton />
+}
+
+const publicViewerActions = {
+  // No actions - view only
+}
+```
+
+**Benefits**:
+- No global readOnly state to manage
+- Actions are explicit per view context
+- Easy to add/remove actions without conditional logic
+- Testable in isolation
+
+### 6.4 Sprint 1 Scope (Winner Selection)
+
+For Sprint 1, winner selection remains simple:
+
+- Click match → Inline winner selection (two buttons)
+- No slide-over panel
+- No score tracking
+- No penalties
+- No judge details
+
+**Removed from Sprint 1**:
+- `MatchDetailPanel` (slide-over component)
+- Score input fields
+- Penalty tracking
+- Judge assignment UI
+
+**Future sprints** will add:
+- `MatchDetailPanel` with full scoring UI
+- Penalty and judge integration
+- Detailed match statistics
+
+### 6.5 Component Implementation Notes
+
+#### BracketView
+
+The bracket visualization renders matches in a CSS Grid layout:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Round 1        │ Quarterfinals │ Semifinals │ Final │
+├────────────────┼───────────────┼────────────┼───────┤
+│ Match 1        │               │            │       │
+│ ├─ Slot A      │               │            │       │
+│ └─ Slot B      │               │            │       │
+│                ├───────────────┤            │       │
+│ Match 2        │               │            │       │
+│ ├─ Slot A      │               │            │       │
+│ └─ Slot B      │               │            │       │
+│                │               ├────────────┤       │
+│ ...            │ ...           │ ...        │       │
+│                │               │            ├───────┤
+│                │               │            │Champion│
+└────────────────┴───────────────┴────────────┴───────┘
+```
+
+Each `BracketMatch` component:
+- Displays competitor slots (A and B)
+- Shows BYE indicators
+- Highlights the winner
+- Emits `onMatchClick` for organizer interaction
+
+---
+
+## 7. State Management Strategy
 
 ### Server State (Source of Truth)
 
@@ -1041,6 +1190,81 @@ No runtime dependencies.
 | Error handling            | Layered (route handler catches, translates) | High       |
 | Bracket rendering         | Custom CSS Grid component                   | Medium     |
 | Authentication            | PIN-based (MVP), Supabase Auth (v2)         | High       |
+| Bracket UI pattern        | Container/Presentation                      | High       |
+| Actions architecture      | Composable (injected per view)              | High       |
+
+---
+
+## 16. Feature-based Organization (Recommendation)
+
+### Current Structure (Recommended for Sprint 1)
+
+```
+apps/web/
+├── components/
+│   ├── ui/           # Generic primitives
+│   ├── tournament/   # Tournament-specific
+│   ├── category/     # Category-specific
+│   ├── bracket/      # Bracket visualization
+│   └── shared/       # Cross-cutting
+├── hooks/
+├── lib/
+└── app/              # Next.js App Router
+```
+
+### Alternative: Feature-based Structure
+
+```
+apps/web/
+├── features/
+│   ├── tournament/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── api/
+│   ├── bracket/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   └── api/
+│   └── shared/
+├── lib/
+└── app/
+```
+
+### Recommendation: Postpone Feature-based Organization
+
+**Rationale**:
+
+| Factor | Current Structure | Feature-based |
+|--------|-------------------|---------------|
+| **Sprint 1 fit** | ✅ Appropriate | ⚠️ Overhead |
+| **Team size** | ✅ Small team | ⚠️ Better for larger teams |
+| **Complexity** | ✅ Lower | ⚠️ Higher |
+| **Cross-feature reuse** | ⚠️ Requires discipline | ✅ Explicit boundaries |
+| **Scalability** | ⚠️ Needs refactoring later | ✅ Ready for growth |
+
+**Tradeoffs**:
+
+**Keep current structure (Recommended)**:
+- ✅ Lower cognitive load for Sprint 1
+- ✅ Faster initial development
+- ✅ Simpler imports and navigation
+- ⚠️ May need refactoring when adding v1.1 features
+- ⚠️ Requires discipline to keep features separated
+
+**Switch to feature-based now**:
+- ✅ Clear feature boundaries from day one
+- ✅ Easier to add new features without touching existing code
+- ✅ Better test organization (co-located tests)
+- ⚠️ More directories to navigate
+- ⚠️ May be premature optimization for single-developer MVP
+- ⚠️ Adds structural complexity before product complexity
+
+**Decision**: Postpone feature-based organization until v1.1 (Repechage). By then:
+- We'll have real experience with feature boundaries
+- The cost of refactoring will be justified by multiple features
+- Team size may justify the organizational overhead
+
+**Migration trigger**: When adding the second tournament format (Repechage in v1.1), evaluate if feature-based organization provides clear benefits. If yes, migrate then.
 
 ---
 
