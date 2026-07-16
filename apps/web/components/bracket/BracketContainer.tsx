@@ -9,6 +9,7 @@ import { useBracketGeneration } from '@/hooks/useBracketGeneration';
 import { useMatchResolution } from '@/hooks/useMatchResolution';
 import { useRandomDraw } from '@/hooks/useRandomDraw';
 import type { CompetitorInput } from '@/lib/draw';
+import { MatchCard } from './MatchCard';
 
 const DEMO_COMPETITORS: readonly CompetitorInput[] = [
   { id: '1', name: 'Tanaka Kenji', club: 'Tokyo Karate Center', seed: 1 },
@@ -151,48 +152,20 @@ export function BracketContainer({ tournamentId, categoryId }: BracketContainerP
                         const canResolve = canResolveMatch(match.id);
 
                         return (
-                          <div
+                          <MatchCard
                             key={match.id}
-                            className={`space-y-2 rounded border p-3 ${
-                              match.isBye ? 'opacity-75' : ''
-                            } ${isSelected ? 'ring-2 ring-primary' : ''}`}
-                          >
-                            <div className="font-medium">
-                              Match {match.position + 1}
-                            </div>
-                            <div className="text-sm">
-                              {competitorAName} vs {competitorBName}
-                            </div>
-                            {match.isBye && (
-                              <span className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
-                                Auto-advance
-                              </span>
-                            )}
-                            {hasWinner && (
-                              <div className="text-sm font-medium text-green-600">
-                                Winner: {match.winner?.name}
-                              </div>
-                            )}
-                            {canResolve && !hasWinner && (
-                              <Button
-                                size="sm"
-                                className="w-full"
-                                onClick={() => handleMatchClick(match.id)}
-                              >
-                                Select Winner
-                              </Button>
-                            )}
-                            {canUndoMatch(match.id) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => handleUndo(match.id)}
-                              >
-                                Undo
-                              </Button>
-                            )}
-                          </div>
+                            position={match.position}
+                            isBye={match.isBye}
+                            isSelected={isSelected}
+                            competitorAName={competitorAName}
+                            competitorBName={competitorBName}
+                            hasWinner={hasWinner}
+                            winnerName={match.winner?.name ?? null}
+                            canResolve={canResolve}
+                            canUndo={canUndoMatch(match.id)}
+                            onSelectWinner={() => handleMatchClick(match.id)}
+                            onUndo={() => handleUndo(match.id)}
+                          />
                         );
                       })}
                     </div>
