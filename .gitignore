@@ -17,7 +17,7 @@ node_modules
 .vite
 
 # next.js
-/.next/
+.next/
 /out/
 
 # production
