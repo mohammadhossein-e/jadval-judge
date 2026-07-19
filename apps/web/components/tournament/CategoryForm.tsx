@@ -36,8 +36,7 @@ export function CategoryForm({
 
   const isValid = name.trim().length > 0;
 
-  function handleSubmit(e: React.FormEvent): void {
-    e.preventDefault();
+  function handleSubmit(): void {
     if (!isValid) return;
     onSubmit({
       name: name.trim(),
@@ -48,7 +47,7 @@ export function CategoryForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="category-name">Category Name *</Label>
@@ -118,10 +117,10 @@ export function CategoryForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={!isValid}>
+        <Button type="button" disabled={!isValid} onClick={handleSubmit}>
           {submitLabel}
         </Button>
       </div>
-    </form>
+    </div>
   );
 }
