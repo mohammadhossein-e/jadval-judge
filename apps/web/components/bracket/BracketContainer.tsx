@@ -100,12 +100,14 @@ export function BracketContainer({ tournamentId, categoryId }: BracketContainerP
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Bracket</h1>
-          <p className="text-muted-foreground">Male Kata Under 12 - Single Elimination</p>
+      <div className="flex items-start justify-between gap-4 rounded-lg border bg-card p-6 shadow-sm">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Bracket</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Male Kata Under 12 — Single Elimination
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {!isGenerated && (
             <Button onClick={handleGenerate} disabled={isGenerated}>
               Generate Bracket
