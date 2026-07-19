@@ -3,13 +3,11 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { useBracketGeneration } from '@/hooks/useBracketGeneration';
 import { useMatchResolution } from '@/hooks/useMatchResolution';
 import { useRandomDraw } from '@/hooks/useRandomDraw';
 import type { CompetitorInput } from '@/lib/draw';
-import { MatchCard } from './MatchCard';
+import { BracketView } from './BracketView';
 
 const DEMO_COMPETITORS: readonly CompetitorInput[] = [
   { id: '1', name: 'Tanaka Kenji', club: 'Tokyo Karate Center', seed: 1 },
@@ -93,6 +91,13 @@ export function BracketContainer({ tournamentId, categoryId }: BracketContainerP
     return `Round ${round}`;
   };
 
+  const roundNames: Record<number, string> = {};
+  if (bracket) {
+    for (const round of rounds) {
+      roundNames[round] = getRoundName(round, bracket.totalRounds);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -123,110 +128,19 @@ export function BracketContainer({ tournamentId, categoryId }: BracketContainerP
       </div>
 
       {isGenerated && bracket && (
-        <>
-          {rounds.map((round) => {
-            const roundMatches = bracket.matches.filter((m) => m.round === round);
-            const roundName = getRoundName(round, bracket.totalRounds);
-
-            return (
-              <div key={round}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{roundName}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className={`grid gap-4 ${
-                        roundMatches.length <= 2
-                          ? 'grid-cols-2'
-                          : roundMatches.length <= 4
-                            ? 'grid-cols-4'
-                            : 'grid-cols-2'
-                      }`}
-                    >
-                      {roundMatches.map((match) => {
-                        const competitorAName = match.competitorA?.name ?? 'TBD';
-                        const competitorBName = match.competitorB?.name ?? 'BYE';
-                        const hasWinner = match.winner !== null;
-                        const isSelected = selectedMatchId === match.id;
-                        const canResolve = canResolveMatch(match.id);
-
-                        return (
-                          <MatchCard
-                            key={match.id}
-                            position={match.position}
-                            isBye={match.isBye}
-                            isSelected={isSelected}
-                            competitorAName={competitorAName}
-                            competitorBName={competitorBName}
-                            hasWinner={hasWinner}
-                            winnerName={match.winner?.name ?? null}
-                            canResolve={canResolve}
-                            canUndo={canUndoMatch(match.id)}
-                            onSelectWinner={() => handleMatchClick(match.id)}
-                            onUndo={() => handleUndo(match.id)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {round < rounds[rounds.length - 1] && <Separator className="my-4" />}
-              </div>
-            );
-          })}
-
-          {champion && (
-            <Card className="border-green-500 bg-green-50">
-              <CardHeader>
-                <CardTitle className="text-green-700">Champion</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold text-green-800">
-                  {champion.name}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {selectedMatchId && bracket && (
-        <Card className="fixed bottom-4 right-4 w-80 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-sm">Select Winner</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {(() => {
-              const match = bracket.matches.find((m) => m.id === selectedMatchId);
-              if (!match || !match.competitorA || !match.competitorB) return null;
-              return (
-                <>
-                  <Button
-                    className="w-full"
-                    onClick={() => handleResolveWinner(match.id, match.competitorA!.id)}
-                  >
-                    {match.competitorA.name}
-                  </Button>
-                  <Button
-                    className="w-full"
-                    onClick={() => handleResolveWinner(match.id, match.competitorB!.id)}
-                  >
-                    {match.competitorB.name}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setSelectedMatchId(null)}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
+        <BracketView
+          bracket={bracket}
+          rounds={rounds}
+          roundNames={roundNames}
+          selectedMatchId={selectedMatchId}
+          champion={champion}
+          canResolveMatch={canResolveMatch}
+          canUndoMatch={canUndoMatch}
+          onSelectWinner={handleMatchClick}
+          onUndo={handleUndo}
+          onResolveWinner={handleResolveWinner}
+          onCancelSelection={() => setSelectedMatchId(null)}
+        />
       )}
     </div>
   );
