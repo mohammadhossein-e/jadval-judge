@@ -15,6 +15,7 @@ import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { CategoryList } from './CategoryList';
 import { TOURNAMENT_TYPE_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { getRepository } from '@/lib/repositories';
 
 interface LocalCategory extends CategoryFormData {
   localId: string;
@@ -63,38 +64,37 @@ export function CreateTournamentForm() {
   }
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
+    console.log('[CreateTournamentForm] handleSubmit START');
     e.preventDefault();
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      console.log('[CreateTournamentForm] BLOCKED: form invalid');
+      return;
+    }
+    console.log('[CreateTournamentForm] validation passed');
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          date,
-          organization: organization.trim() || null,
-          tournamentType,
-          categories: categories.map((c) => ({
-            name: c.name,
-            gender: c.gender,
-            ageGroup: c.ageGroup,
-            beltLevel: c.beltLevel,
-          })),
-        }),
+      const repo = getRepository();
+      console.log('[CreateTournamentForm] BEFORE createTournament');
+      const tournament = repo.createTournament({
+        name: name.trim(),
+        date,
+        organization: organization.trim() || null,
+        tournamentType,
+        categories: categories.map((c) => ({
+          name: c.name,
+          gender: c.gender,
+          ageGroup: c.ageGroup,
+          beltLevel: c.beltLevel,
+        })),
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error ?? 'Failed to create tournament');
-      }
-
-      const { data } = await response.json();
+      console.log('[CreateTournamentForm] AFTER createTournament, id:', tournament.id);
       toast.success('Tournament created');
-      router.push(`/tournaments/${data.id}`);
+      console.log('[CreateTournamentForm] BEFORE router.push to', `/tournaments/${tournament.id}`);
+      router.push(`/tournaments/${tournament.id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong';
+      console.error('[CreateTournamentForm] ERROR:', message);
       toast.error(message);
     } finally {
       setIsSubmitting(false);

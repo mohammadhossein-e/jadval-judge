@@ -21,6 +21,7 @@ interface CategoryListProps {
   categories: CategoryItem[];
   onEdit: (id: string) => void;
   onRemove: (id: string) => void;
+  requiresDeleteConfirmation?: (id: string) => boolean;
 }
 
 function formatTags(
@@ -35,7 +36,7 @@ function formatTags(
   return tags;
 }
 
-export function CategoryList({ categories, onEdit, onRemove }: CategoryListProps) {
+export function CategoryList({ categories, onEdit, onRemove, requiresDeleteConfirmation }: CategoryListProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   if (categories.length === 0) {
@@ -88,7 +89,13 @@ export function CategoryList({ categories, onEdit, onRemove }: CategoryListProps
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  onClick={() => setPendingDeleteId(category.id)}
+                  onClick={() => {
+                    if (requiresDeleteConfirmation?.(category.id)) {
+                      setPendingDeleteId(category.id);
+                    } else {
+                      onRemove(category.id);
+                    }
+                  }}
                 >
                   <Trash2 />
                   <span className="sr-only">Remove category</span>
