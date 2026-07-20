@@ -38,7 +38,10 @@ export function useBracketGeneration(
   const seeds = useMemo(() => competitors.map((c) => c.seed), [competitors]);
 
   const preview: BracketPreview = useMemo(
-    () => getBracketPreview(competitors.length, seeds),
+    () =>
+      competitors.length >= 2
+        ? getBracketPreview(competitors.length, seeds)
+        : { competitorCount: competitors.length, bracketSize: 0, byeCount: 0, totalRounds: 0, seededByes: [] },
     [competitors.length, seeds],
   );
 
