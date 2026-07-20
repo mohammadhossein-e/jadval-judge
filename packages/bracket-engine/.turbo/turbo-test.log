@@ -6,14 +6,14 @@
 
  RUN  v1.6.1 /Users/mhe/Desktop/jadval-judge/packages/bracket-engine
 
- ✓ __tests__/single-elimination/advancement.test.ts  (10 tests) 5ms
- ✓ __tests__/single-elimination/generator.test.ts  (24 tests) 24ms
- ✓ __tests__/single-elimination/seeding.test.ts  (16 tests) 103ms
- ✓ __tests__/single-elimination/byes.test.ts  (8 tests) 6ms
- ✓ __tests__/single-elimination/cascade.test.ts  (7 tests) 62ms
+ ✓ __tests__/single-elimination/generator.test.ts  (24 tests) 7ms
+ ✓ __tests__/single-elimination/advancement.test.ts  (10 tests) 19ms
+ ✓ __tests__/single-elimination/seeding.test.ts  (16 tests) 21ms
+ ✓ __tests__/single-elimination/cascade.test.ts  (7 tests) 10ms
+ ✓ __tests__/single-elimination/byes.test.ts  (8 tests) 23ms
 
  Test Files  5 passed (5)
       Tests  65 passed (65)
-   Start at  14:10:49
-   Duration  921ms (transform 248ms, setup 0ms, collect 509ms, tests 200ms, environment 1ms, prepare 728ms)
+   Start at  15:08:00
+   Duration  939ms (transform 165ms, setup 0ms, collect 594ms, tests 80ms, environment 2ms, prepare 1.27s)
 

@@ -164,7 +164,7 @@ export function ManualDrawCard({ competitors, onPlacementStatusChange }: ManualD
           <UnplacedPool
             unplacedCompetitors={unplacedCompetitors}
             unplacedCount={unplacedCount}
-            showPool={placedCount > 0}
+            showPool={unplacedCount > 0}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDrop={handlePoolDrop}
