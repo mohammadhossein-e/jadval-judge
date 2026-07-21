@@ -10,6 +10,11 @@ export interface CompetitorInput {
 export interface DrawEntry {
   position: number;
   competitorId: string;
+}
+
+export interface ResolvedSlot {
+  position: number;
+  competitorId: string;
   name: string;
   club: string;
   seed: number | null;
@@ -20,16 +25,51 @@ export function performDraw(competitors: readonly CompetitorInput[]): DrawEntry[
   return shuffled.map((c, i) => ({
     position: i + 1,
     competitorId: c.id,
-    name: c.name,
-    club: c.club,
-    seed: c.seed,
   }));
 }
 
 export type ManualSlots = (DrawEntry | null)[];
+export type ResolvedSlots = (ResolvedSlot | null)[];
 
 export function createEmptySlots(count: number): ManualSlots {
   return Array.from({ length: count }, () => null);
+}
+
+export function resolveSlots(
+  slots: ManualSlots,
+  competitorMap: Map<string, CompetitorInput>,
+): ResolvedSlots {
+  return slots.map((slot) => {
+    if (slot === null) return null;
+    const c = competitorMap.get(slot.competitorId);
+    if (!c) return null;
+    return {
+      position: slot.position,
+      competitorId: slot.competitorId,
+      name: c.name,
+      club: c.club,
+      seed: c.seed,
+    };
+  });
+}
+
+export function resolveDrawEntries(
+  entries: DrawEntry[],
+  competitorMap: Map<string, CompetitorInput>,
+): ResolvedSlot[] {
+  return entries
+    .map((entry) => {
+      const c = competitorMap.get(entry.competitorId);
+      if (!c) return null;
+      return {
+        position: entry.position,
+        competitorId: entry.competitorId,
+        name: c.name,
+        club: c.club,
+        seed: c.seed,
+      };
+    })
+    .filter((e): e is ResolvedSlot => e !== null);
 }
 
 export function getUnplacedCompetitors(
@@ -61,6 +101,35 @@ export function drawEntriesToPlacements(entries: DrawEntry[]): Map<number, strin
     placements.set(entry.position - 1, entry.competitorId);
   }
   return placements;
+}
+
+export function syncSlots(
+  competitors: readonly CompetitorInput[],
+  currentSlots: ManualSlots,
+): ManualSlots {
+  const validIds = new Set(competitors.map((c) => c.id));
+
+  const cleaned: ManualSlots = [];
+  for (const slot of currentSlots) {
+    if (slot === null || validIds.has(slot.competitorId)) {
+      cleaned.push(slot);
+    }
+  }
+
+  while (cleaned.length < competitors.length) {
+    cleaned.push(null);
+  }
+
+  while (cleaned.length > competitors.length) {
+    const lastNull = cleaned.lastIndexOf(null);
+    if (lastNull !== -1) {
+      cleaned.splice(lastNull, 1);
+    } else {
+      cleaned.length = competitors.length;
+    }
+  }
+
+  return cleaned.map((slot, i) => (slot ? { ...slot, position: i } : null));
 }
 
 export function manualSlotsToPlacements(slots: ManualSlots): Map<number, string> {

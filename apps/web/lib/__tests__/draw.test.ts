@@ -6,7 +6,11 @@ import {
   validateManualPlacement,
   drawEntriesToPlacements,
   manualSlotsToPlacements,
+  resolveSlots,
+  resolveDrawEntries,
+  syncSlots,
   type CompetitorInput,
+  type DrawEntry,
 } from '../draw';
 
 describe('performDraw', () => {
@@ -27,16 +31,18 @@ describe('performDraw', () => {
     expect(positions).toEqual([1, 2, 3]);
   });
 
-  it('preserves all competitor data', () => {
+  it('preserves all competitor IDs', () => {
     const result = performDraw(competitors);
     const ids = result.map((e) => e.competitorId).sort();
     expect(ids).toEqual(['c1', 'c2', 'c3']);
+  });
 
+  it('does not include metadata in entries', () => {
+    const result = performDraw(competitors);
     for (const entry of result) {
-      const source = competitors.find((c) => c.id === entry.competitorId)!;
-      expect(entry.name).toBe(source.name);
-      expect(entry.club).toBe(source.club);
-      expect(entry.seed).toBe(source.seed);
+      expect(entry).not.toHaveProperty('name');
+      expect(entry).not.toHaveProperty('club');
+      expect(entry).not.toHaveProperty('seed');
     }
   });
 
@@ -57,16 +63,7 @@ describe('performDraw', () => {
     expect(result[0]).toEqual({
       position: 1,
       competitorId: 'c1',
-      name: 'Alice',
-      club: 'Tokyo',
-      seed: 1,
     });
-  });
-
-  it('preserves seed values including null', () => {
-    const result = performDraw(competitors);
-    const seeds = result.map((e) => e.seed).sort((a, b) => (a ?? 0) - (b ?? 0));
-    expect(seeds).toEqual([null, 1, 2]);
   });
 
   it('works with 128 competitors', () => {
@@ -102,6 +99,103 @@ describe('createEmptySlots', () => {
   });
 });
 
+describe('resolveSlots', () => {
+  const competitors: readonly CompetitorInput[] = [
+    { id: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
+    { id: 'c2', name: 'Bob', club: 'Osaka', seed: null },
+    { id: 'c3', name: 'Carol', club: 'Kyoto', seed: 2 },
+  ];
+  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
+
+  it('resolves placed entries with competitor data', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      null,
+      { position: 2, competitorId: 'c3' },
+    ];
+    const result = resolveSlots(slots, competitorMap);
+    expect(result[0]).toEqual({
+      position: 0,
+      competitorId: 'c1',
+      name: 'Alice',
+      club: 'Tokyo',
+      seed: 1,
+    });
+    expect(result[1]).toBeNull();
+    expect(result[2]).toEqual({
+      position: 2,
+      competitorId: 'c3',
+      name: 'Carol',
+      club: 'Kyoto',
+      seed: 2,
+    });
+  });
+
+  it('returns null for entries with unknown competitor IDs', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'unknown' },
+    ];
+    const result = resolveSlots(slots, competitorMap);
+    expect(result[0]).toBeNull();
+  });
+
+  it('returns empty array for empty slots', () => {
+    const result = resolveSlots([], competitorMap);
+    expect(result).toEqual([]);
+  });
+
+  it('returns all nulls for all-null slots', () => {
+    const result = resolveSlots([null, null], competitorMap);
+    expect(result).toEqual([null, null]);
+  });
+});
+
+describe('resolveDrawEntries', () => {
+  const competitors: readonly CompetitorInput[] = [
+    { id: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
+    { id: 'c2', name: 'Bob', club: 'Osaka', seed: null },
+  ];
+  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
+
+  it('resolves entries with competitor data', () => {
+    const entries: DrawEntry[] = [
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'c2' },
+    ];
+    const result = resolveDrawEntries(entries, competitorMap);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      position: 1,
+      competitorId: 'c1',
+      name: 'Alice',
+      club: 'Tokyo',
+      seed: 1,
+    });
+    expect(result[1]).toEqual({
+      position: 2,
+      competitorId: 'c2',
+      name: 'Bob',
+      club: 'Osaka',
+      seed: null,
+    });
+  });
+
+  it('filters out entries with unknown competitor IDs', () => {
+    const entries: DrawEntry[] = [
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'unknown' },
+    ];
+    const result = resolveDrawEntries(entries, competitorMap);
+    expect(result).toHaveLength(1);
+    expect(result[0].competitorId).toBe('c1');
+  });
+
+  it('returns empty array for empty entries', () => {
+    const result = resolveDrawEntries([], competitorMap);
+    expect(result).toEqual([]);
+  });
+});
+
 describe('getUnplacedCompetitors', () => {
   const competitors: readonly CompetitorInput[] = [
     { id: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
@@ -117,18 +211,18 @@ describe('getUnplacedCompetitors', () => {
   });
 
   it('returns no competitors when all slots are filled', () => {
-    const slots = [
-      { position: 1, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 as number | null },
-      { position: 2, competitorId: 'c2', name: 'Bob', club: 'Osaka', seed: null as number | null },
-      { position: 3, competitorId: 'c3', name: 'Carol', club: 'Kyoto', seed: 2 as number | null },
+    const slots: DrawEntry[] = [
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'c2' },
+      { position: 3, competitorId: 'c3' },
     ];
     const result = getUnplacedCompetitors(competitors, slots);
     expect(result).toHaveLength(0);
   });
 
   it('excludes placed competitors', () => {
-    const slots = [
-      { position: 1, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 as number | null },
+    const slots: (DrawEntry | null)[] = [
+      { position: 1, competitorId: 'c1' },
       null,
       null,
     ];
@@ -157,8 +251,8 @@ describe('validateManualPlacement', () => {
   });
 
   it('reports incomplete when partially placed', () => {
-    const slots = [
-      { position: 1, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 as number | null },
+    const slots: (DrawEntry | null)[] = [
+      { position: 1, competitorId: 'c1' },
       null,
     ];
     const result = validateManualPlacement(competitors, slots);
@@ -168,9 +262,9 @@ describe('validateManualPlacement', () => {
   });
 
   it('reports complete when all placed', () => {
-    const slots = [
-      { position: 1, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 as number | null },
-      { position: 2, competitorId: 'c2', name: 'Bob', club: 'Osaka', seed: null as number | null },
+    const slots: DrawEntry[] = [
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'c2' },
     ];
     const result = validateManualPlacement(competitors, slots);
     expect(result.isComplete).toBe(true);
@@ -188,10 +282,10 @@ describe('validateManualPlacement', () => {
 
 describe('drawEntriesToPlacements', () => {
   it('converts 1-indexed DrawEntry positions to 0-indexed Map', () => {
-    const entries = [
-      { position: 1, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
-      { position: 2, competitorId: 'c2', name: 'Bob', club: 'Osaka', seed: null },
-      { position: 3, competitorId: 'c3', name: 'Carol', club: 'Kyoto', seed: 2 },
+    const entries: DrawEntry[] = [
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'c2' },
+      { position: 3, competitorId: 'c3' },
     ];
     const result = drawEntriesToPlacements(entries);
     expect(result.size).toBe(3);
@@ -208,10 +302,10 @@ describe('drawEntriesToPlacements', () => {
 
 describe('manualSlotsToPlacements', () => {
   it('converts ManualSlots to Map with 0-indexed positions', () => {
-    const slots = [
-      { position: 0, competitorId: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
       null,
-      { position: 2, competitorId: 'c3', name: 'Carol', club: 'Kyoto', seed: 2 },
+      { position: 2, competitorId: 'c3' },
     ];
     const result = manualSlotsToPlacements(slots);
     expect(result.size).toBe(2);
@@ -228,5 +322,159 @@ describe('manualSlotsToPlacements', () => {
   it('returns empty Map for empty array', () => {
     const result = manualSlotsToPlacements([]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe('syncSlots', () => {
+  const competitors: readonly CompetitorInput[] = [
+    { id: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 },
+    { id: 'c2', name: 'Bob', club: 'Osaka', seed: null },
+    { id: 'c3', name: 'Carol', club: 'Kyoto', seed: 2 },
+  ];
+
+  it('preserves existing placements when competitors unchanged', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      null,
+      { position: 2, competitorId: 'c3' },
+    ];
+    const result = syncSlots(competitors, slots);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toBeNull();
+    expect(result[2]).toEqual({ position: 2, competitorId: 'c3' });
+  });
+
+  it('appends null slots when competitor is added', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      null,
+    ];
+    const newCompetitors = [...competitors];
+    const result = syncSlots(newCompetitors, slots);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toBeNull();
+    expect(result[2]).toBeNull();
+  });
+
+  it('compacts array when placed competitor is deleted', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      { position: 1, competitorId: 'c2' },
+      { position: 2, competitorId: 'c3' },
+    ];
+    const remaining = competitors.filter((c) => c.id !== 'c2');
+    const result = syncSlots(remaining, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toEqual({ position: 1, competitorId: 'c3' });
+  });
+
+  it('shifts later entries left when placed competitor is deleted from middle', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      { position: 1, competitorId: 'c2' },
+      { position: 2, competitorId: 'c3' },
+    ];
+    const remaining = competitors.filter((c) => c.id !== 'c1');
+    const result = syncSlots(remaining, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c2' });
+    expect(result[1]).toEqual({ position: 1, competitorId: 'c3' });
+  });
+
+  it('preserves positions of remaining entries after delete', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      null,
+      { position: 2, competitorId: 'c3' },
+    ];
+    const remaining = competitors.filter((c) => c.id !== 'c3');
+    const result = syncSlots(remaining, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toBeNull();
+  });
+
+  it('handles remove and add simultaneously (same length)', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      { position: 1, competitorId: 'c2' },
+    ];
+    const updated = [
+      { id: 'c1', name: 'Alice', club: 'Tokyo', seed: 1 as number | null },
+      { id: 'c4', name: 'Dave', club: 'Nagoya', seed: null as number | null },
+    ];
+    const result = syncSlots(updated, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toBeNull();
+  });
+
+  it('handles bulk add', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+    ];
+    const expanded = [
+      ...competitors,
+      { id: 'c4', name: 'Dave', club: 'Nagoya', seed: null },
+      { id: 'c5', name: 'Eve', club: 'Osaka', seed: null },
+    ];
+    const result = syncSlots(expanded, slots);
+    expect(result).toHaveLength(5);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toBeNull();
+    expect(result[2]).toBeNull();
+    expect(result[3]).toBeNull();
+    expect(result[4]).toBeNull();
+  });
+
+  it('returns all nulls for empty competitor list', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+    ];
+    const result = syncSlots([], slots);
+    expect(result).toEqual([]);
+  });
+
+  it('returns all nulls for empty slots and empty competitors', () => {
+    const result = syncSlots([], []);
+    expect(result).toEqual([]);
+  });
+
+  it('truncates slots that exceed new competitor count', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      { position: 1, competitorId: 'c2' },
+      { position: 2, competitorId: 'c3' },
+    ];
+    const reduced = competitors.filter((c) => c.id !== 'c3');
+    const result = syncSlots(reduced, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0, competitorId: 'c1' });
+    expect(result[1]).toEqual({ position: 1, competitorId: 'c2' });
+  });
+
+  it('evicts valid entry when it falls outside new length', () => {
+    const slots: (DrawEntry | null)[] = [
+      null,
+      null,
+      { position: 2, competitorId: 'c3' },
+    ];
+    const reduced = competitors.filter((c) => c.id !== 'c3');
+    const result = syncSlots(reduced, slots);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBeNull();
+    expect(result[1]).toBeNull();
+  });
+
+  it('does not mutate the original slots array', () => {
+    const slots: (DrawEntry | null)[] = [
+      { position: 0, competitorId: 'c1' },
+      null,
+    ];
+    const original = [...slots];
+    syncSlots(competitors, slots);
+    expect(slots).toEqual(original);
   });
 });

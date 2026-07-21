@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import {
   createEmptySlots,
   getUnplacedCompetitors,
+  syncSlots,
   validateManualPlacement,
   type CompetitorInput,
   type DrawEntry,
@@ -30,6 +31,12 @@ export function useManualDraw(competitors: readonly CompetitorInput[]): UseManua
     [competitors],
   );
 
+  const [prevCompetitors, setPrevCompetitors] = useState(competitors);
+  if (prevCompetitors !== competitors) {
+    setPrevCompetitors(competitors);
+    setSlots((prev) => syncSlots(competitors, prev));
+  }
+
   const unplacedCompetitors = useMemo(
     () => getUnplacedCompetitors(competitors, slots),
     [competitors, slots],
@@ -54,9 +61,6 @@ export function useManualDraw(competitors: readonly CompetitorInput[]): UseManua
         const entry: DrawEntry = {
           position: targetPosition,
           competitorId: competitor.id,
-          name: competitor.name,
-          club: competitor.club,
-          seed: competitor.seed,
         };
 
         if (existingIndex !== -1) {

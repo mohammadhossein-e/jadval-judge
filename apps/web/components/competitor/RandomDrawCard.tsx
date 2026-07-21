@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useRandomDraw } from '@/hooks/useRandomDraw';
 import type { CompetitorInput, DrawEntry } from '@/lib/draw';
+import { resolveDrawEntries } from '@/lib/draw';
 import { Shuffle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,6 +24,16 @@ interface RandomDrawCardProps {
 export function RandomDrawCard({ competitors, onDrawStatusChange }: RandomDrawCardProps) {
   const { drawResult, hasDraw, executeDraw } = useRandomDraw();
   const [showRedrawConfirm, setShowRedrawConfirm] = useState(false);
+
+  const competitorMap = useMemo(
+    () => new Map(competitors.map((c) => [c.id, c])),
+    [competitors],
+  );
+
+  const resolvedEntries = useMemo(
+    () => (drawResult ? resolveDrawEntries(drawResult, competitorMap) : null),
+    [drawResult, competitorMap],
+  );
 
   useEffect(() => {
     onDrawStatusChange?.({ hasDraw, drawResult: drawResult ?? null });
@@ -56,11 +67,11 @@ export function RandomDrawCard({ competitors, onDrawStatusChange }: RandomDrawCa
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {hasDraw && drawResult && (
+          {hasDraw && resolvedEntries && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Draw Order</p>
               <div className="space-y-1.5">
-                {drawResult.map((entry) => (
+                {resolvedEntries.map((entry) => (
                   <div
                     key={entry.competitorId}
                     className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"

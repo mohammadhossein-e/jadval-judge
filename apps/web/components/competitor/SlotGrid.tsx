@@ -2,11 +2,11 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { ManualSlots } from '@/lib/draw';
+import type { ResolvedSlots } from '@/lib/draw';
 import { GripVertical, X } from 'lucide-react';
 
 interface SlotGridProps {
-  slots: ManualSlots;
+  slots: ResolvedSlots;
   dragOverSlot: number | null;
   isDragging: boolean;
   onDragStart: (

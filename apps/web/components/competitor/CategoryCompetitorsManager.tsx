@@ -85,7 +85,6 @@ export function CategoryCompetitorsManager({
   if (competitorSignature !== prevSignature) {
     setPrevSignature(competitorSignature);
     setRandomDrawStatus({ hasDraw: false, drawResult: null });
-    setManualDrawStatus({ isComplete: false, placedCount: 0, unplacedCount: 0, slots: [] });
   }
 
   const [prevDrawType, setPrevDrawType] = useState(drawType);
@@ -317,7 +316,6 @@ export function CategoryCompetitorsManager({
           </div>
           <div hidden={drawType !== 'manual'}>
             <ManualDrawCard
-              key={`manual-${competitorSignature}`}
               competitors={competitorItems}
               onPlacementStatusChange={handleManualDrawStatusChange}
             />

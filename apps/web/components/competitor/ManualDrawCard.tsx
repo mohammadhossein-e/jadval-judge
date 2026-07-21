@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useManualDraw } from '@/hooks/useManualDraw';
 import type { CompetitorInput, ManualSlots } from '@/lib/draw';
+import { resolveSlots } from '@/lib/draw';
 import { RotateCcw } from 'lucide-react';
 import { SlotGrid } from './SlotGrid';
 import { UnplacedPool } from './UnplacedPool';
@@ -45,6 +46,16 @@ export function ManualDrawCard({ competitors, onPlacementStatusChange }: ManualD
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragDataRef = useRef<DragData | null>(null);
+
+  const competitorMap = useMemo(
+    () => new Map(competitors.map((c) => [c.id, c])),
+    [competitors],
+  );
+
+  const resolvedSlots = useMemo(
+    () => resolveSlots(slots, competitorMap),
+    [slots, competitorMap],
+  );
 
   useEffect(() => {
     onPlacementStatusChange?.({ isComplete, placedCount, unplacedCount, slots });
@@ -149,7 +160,7 @@ export function ManualDrawCard({ competitors, onPlacementStatusChange }: ManualD
         </CardHeader>
         <CardContent className="space-y-4">
           <SlotGrid
-            slots={slots}
+            slots={resolvedSlots}
             dragOverSlot={dragOverSlot}
             isDragging={isDragging}
             onDragStart={handleDragStart}
