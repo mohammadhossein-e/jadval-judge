@@ -2,6 +2,7 @@ import type {
   Tournament,
   TournamentType,
   Category,
+  Competitor,
   Gender,
   AgeGroup,
   BeltLevel,
@@ -37,6 +38,12 @@ export interface UpdateCategoryInput {
   name: string;
 }
 
+export interface CreateCompetitorInput {
+  name: string;
+  club: string;
+  seed: number | null;
+}
+
 export interface TournamentRepository {
   listTournaments(): Tournament[];
   getTournament(id: string): Tournament | null;
@@ -47,4 +54,6 @@ export interface TournamentRepository {
   createCategory(tournamentId: string, input: CreateCategoryInput): Category;
   updateCategory(id: string, input: UpdateCategoryInput): Category;
   deleteCategory(id: string): void;
+  listCompetitors(categoryId: string): Competitor[];
+  setCompetitors(categoryId: string, competitors: CreateCompetitorInput[]): Competitor[];
 }

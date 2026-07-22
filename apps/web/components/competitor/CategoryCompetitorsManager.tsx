@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -19,15 +19,14 @@ import {
   drawEntriesToPlacements,
   manualSlotsToPlacements,
 } from '@/lib/draw';
+import { getRepository } from '@/lib/repositories';
+import type { Competitor } from '@jadval/types';
+import type { CreateCompetitorInput } from '@/lib/repositories';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MAX_COMPETITORS = 128;
 const MIN_COMPETITORS_FOR_BRACKET = 2;
-
-interface LocalCompetitor extends CompetitorFormData {
-  localId: string;
-}
 
 interface CategoryCompetitorsManagerProps {
   tournamentId: string;
@@ -40,8 +39,21 @@ export function CategoryCompetitorsManager({
   categoryId,
   categoryName = 'Category',
 }: CategoryCompetitorsManagerProps) {
-  const [competitors, setCompetitors] = useState<LocalCompetitor[]>([]);
-  const nextIdRef = useRef(1);
+  const [competitors, setCompetitorsState] = useState<Competitor[]>([]);
+
+  const [prevCategoryId, setPrevCategoryId] = useState<string | null>(null);
+  if (categoryId !== prevCategoryId) {
+    setPrevCategoryId(categoryId);
+    setCompetitorsState(getRepository().listCompetitors(categoryId));
+  }
+
+  const setCompetitors = useCallback(
+    (inputs: CreateCompetitorInput[]) => {
+      const persisted = getRepository().setCompetitors(categoryId, inputs);
+      setCompetitorsState(persisted);
+    },
+    [categoryId],
+  );
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,14 +73,9 @@ export function CategoryCompetitorsManager({
   const existingNames = useMemo(() => competitors.map((c) => c.name), [competitors]);
   const isAtLimit = competitors.length >= MAX_COMPETITORS;
 
-  const competitorItems = useMemo(
-    () => competitors.map((c) => ({ ...c, id: c.localId })),
-    [competitors],
-  );
-
   const competitorSignature = useMemo(
-    () => competitorItems.map((c) => c.id).sort().join('-'),
-    [competitorItems],
+    () => competitors.map((c) => c.id).sort().join('-'),
+    [competitors],
   );
 
   const isDrawReady = drawType === 'random' ? randomDrawStatus.hasDraw : manualDrawStatus.isComplete;
@@ -79,7 +86,7 @@ export function CategoryCompetitorsManager({
     preview,
     generate,
     reset,
-  } = useBracketGeneration(competitorItems, drawType);
+  } = useBracketGeneration(competitors, drawType);
 
   const [prevSignature, setPrevSignature] = useState(competitorSignature);
   if (competitorSignature !== prevSignature) {
@@ -98,78 +105,84 @@ export function CategoryCompetitorsManager({
   }
 
   const handleAdd = useCallback((data: CompetitorFormData) => {
-    const id = nextIdRef.current++;
-    setCompetitors((prev) => [...prev, { ...data, localId: `comp-${id}` }]);
+    setCompetitors([
+      ...competitors.map((c) => ({ name: c.name, club: c.club, seed: c.seed })),
+      { name: data.name, club: data.club, seed: data.seed },
+    ]);
     setShowAddForm(false);
     toast.success('Competitor added');
-  }, []);
+  }, [competitors, setCompetitors]);
 
   const handleEdit = useCallback(
     (data: CompetitorFormData) => {
       if (!editingId) return;
-      setCompetitors((prev) =>
-        prev.map((c) => (c.localId === editingId ? { ...c, ...data } : c)),
+      setCompetitors(
+        competitors.map((c) =>
+          c.id === editingId
+            ? { name: data.name, club: data.club, seed: data.seed }
+            : { name: c.name, club: c.club, seed: c.seed },
+        ),
       );
       setEditingId(null);
       toast.success('Competitor updated');
     },
-    [editingId],
+    [editingId, competitors, setCompetitors],
   );
 
   const handleRemove = useCallback((id: string) => {
-    setCompetitors((prev) => prev.filter((c) => c.localId !== id));
+    setCompetitors(
+      competitors
+        .filter((c) => c.id !== id)
+        .map((c) => ({ name: c.name, club: c.club, seed: c.seed })),
+    );
     setEditingId((eid) => (eid === id ? null : eid));
     toast.success('Competitor removed');
-  }, []);
+  }, [competitors, setCompetitors]);
 
   const handleMoveUp = useCallback((id: string) => {
-    setCompetitors((prev) => {
-      const idx = prev.findIndex((c) => c.localId === id);
-      if (idx <= 0) return prev;
-      const next = [...prev];
-      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-      return next;
-    });
-  }, []);
+    const idx = competitors.findIndex((c) => c.id === id);
+    if (idx <= 0) return;
+    const next = [...competitors];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    setCompetitors(next.map((c) => ({ name: c.name, club: c.club, seed: c.seed })));
+  }, [competitors, setCompetitors]);
 
   const handleMoveDown = useCallback((id: string) => {
-    setCompetitors((prev) => {
-      const idx = prev.findIndex((c) => c.localId === id);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const next = [...prev];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      return next;
-    });
-  }, []);
+    const idx = competitors.findIndex((c) => c.id === id);
+    if (idx < 0 || idx >= competitors.length - 1) return;
+    const next = [...competitors];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    setCompetitors(next.map((c) => ({ name: c.name, club: c.club, seed: c.seed })));
+  }, [competitors, setCompetitors]);
 
   const handleBulkAdd = useCallback((items: CompetitorFormData[]) => {
     let added = 0;
     let skipped = 0;
     let capped = 0;
-    setCompetitors((prev) => {
-      const existingLower = new Set(prev.map((c) => c.name.toLowerCase()));
-      let id = nextIdRef.current;
-      const newItems: LocalCompetitor[] = [];
-      for (const item of items) {
-        if (existingLower.has(item.name.toLowerCase())) {
-          skipped++;
-          continue;
-        }
-        if (prev.length + newItems.length >= MAX_COMPETITORS) {
-          capped++;
-          continue;
-        }
-        existingLower.add(item.name.toLowerCase());
-        newItems.push({ ...item, localId: `comp-${id++}` });
-        added++;
+    const existingLower = new Set(competitors.map((c) => c.name.toLowerCase()));
+    const inputs: CreateCompetitorInput[] = competitors.map((c) => ({
+      name: c.name,
+      club: c.club,
+      seed: c.seed,
+    }));
+    for (const item of items) {
+      if (existingLower.has(item.name.toLowerCase())) {
+        skipped++;
+        continue;
       }
-      nextIdRef.current = id;
-      return [...prev, ...newItems];
-    });
+      if (inputs.length >= MAX_COMPETITORS) {
+        capped++;
+        continue;
+      }
+      existingLower.add(item.name.toLowerCase());
+      inputs.push({ name: item.name, club: item.club, seed: item.seed });
+      added++;
+    }
+    setCompetitors(inputs);
     if (capped > 0) toast.warning(`${capped} competitor${capped === 1 ? '' : 's'} skipped — category limit (${MAX_COMPETITORS}) reached`);
     if (skipped > 0) toast.warning(`${skipped} duplicate${skipped === 1 ? '' : 's'} skipped`);
     if (added > 0) toast.success(`${added} competitor${added === 1 ? '' : 's'} added`);
-  }, []);
+  }, [competitors, setCompetitors]);
 
   const handleRandomDrawStatusChange = useCallback((status: DrawStatus) => {
     setRandomDrawStatus(status);
@@ -180,7 +193,7 @@ export function CategoryCompetitorsManager({
   }, []);
 
   const handleGenerate = useCallback(() => {
-    if (competitorItems.length < MIN_COMPETITORS_FOR_BRACKET) {
+    if (competitors.length < MIN_COMPETITORS_FOR_BRACKET) {
       toast.error('At least 2 competitors required');
       return;
     }
@@ -207,7 +220,7 @@ export function CategoryCompetitorsManager({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate bracket');
     }
-  }, [competitorItems.length, drawType, randomDrawStatus, manualDrawStatus, generate]);
+  }, [competitors.length, drawType, randomDrawStatus, manualDrawStatus, generate]);
 
   const {
     bracket: resolvedBracket,
@@ -228,11 +241,10 @@ export function CategoryCompetitorsManager({
   }, [reset]);
 
   const editingCompetitor = editingId
-    ? competitors.find((c) => c.localId === editingId)
+    ? competitors.find((c) => c.id === editingId)
     : undefined;
 
   void tournamentId;
-  void categoryId;
 
   return (
     <div className="space-y-6">
@@ -252,7 +264,7 @@ export function CategoryCompetitorsManager({
         </CardHeader>
         <CardContent className="space-y-4">
           <CompetitorList
-            competitors={competitorItems}
+            competitors={competitors}
             onEdit={(id) => setEditingId(id)}
             onRemove={handleRemove}
             onMoveUp={handleMoveUp}
@@ -310,20 +322,20 @@ export function CategoryCompetitorsManager({
           <div hidden={drawType !== 'random'}>
             <RandomDrawCard
               key={`random-${competitorSignature}`}
-              competitors={competitorItems}
+              competitors={competitors}
               onDrawStatusChange={handleRandomDrawStatusChange}
             />
           </div>
           <div hidden={drawType !== 'manual'}>
             <ManualDrawCard
-              competitors={competitorItems}
+              competitors={competitors}
               onPlacementStatusChange={handleManualDrawStatusChange}
             />
           </div>
         </>
       )}
 
-      {competitorItems.length >= MIN_COMPETITORS_FOR_BRACKET && isDrawReady && !isGenerated && (
+      {competitors.length >= MIN_COMPETITORS_FOR_BRACKET && isDrawReady && !isGenerated && (
         <BracketPreviewCard
           preview={preview}
           drawType={drawType}

@@ -16,4 +16,5 @@ export type {
   UpdateTournamentInput,
   CreateCategoryInput,
   UpdateCategoryInput,
+  CreateCompetitorInput,
 } from './types';

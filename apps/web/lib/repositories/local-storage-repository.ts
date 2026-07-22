@@ -1,15 +1,17 @@
-import type { Tournament, Category } from '@jadval/types';
+import type { Tournament, Category, Competitor } from '@jadval/types';
 import type {
   TournamentRepository,
   CreateTournamentInput,
   UpdateTournamentInput,
   CreateCategoryInput,
   UpdateCategoryInput,
+  CreateCompetitorInput,
 } from './types';
 
 const STORAGE_PREFIX = 'jadval:';
 const TOURNAMENTS_KEY = `${STORAGE_PREFIX}tournaments`;
 const CATEGORIES_KEY = `${STORAGE_PREFIX}categories`;
+const COMPETITORS_KEY = `${STORAGE_PREFIX}competitors`;
 
 function readStore<T>(key: string): Record<string, T> {
   if (typeof window === 'undefined') return {};
@@ -176,8 +178,56 @@ export class LocalStorageRepository implements TournamentRepository {
   }
 
   deleteCategory(id: string): void {
-    const store = readStore<Category>(CATEGORIES_KEY);
-    delete store[id];
-    writeStore(CATEGORIES_KEY, store);
+    const categoryStore = readStore<Category>(CATEGORIES_KEY);
+    delete categoryStore[id];
+    writeStore(CATEGORIES_KEY, categoryStore);
+
+    const competitorStore = readStore<Competitor>(COMPETITORS_KEY);
+    for (const [key, competitor] of Object.entries(competitorStore)) {
+      if (competitor.categoryId === id) {
+        delete competitorStore[key];
+      }
+    }
+    writeStore(COMPETITORS_KEY, competitorStore);
+  }
+
+  listCompetitors(categoryId: string): Competitor[] {
+    const store = readStore<Competitor>(COMPETITORS_KEY);
+    return Object.values(store)
+      .filter((c) => c.categoryId === categoryId)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+  }
+
+  setCompetitors(
+    categoryId: string,
+    competitors: CreateCompetitorInput[],
+  ): Competitor[] {
+    const now = new Date().toISOString();
+    const store = readStore<Competitor>(COMPETITORS_KEY);
+
+    for (const [key, existing] of Object.entries(store)) {
+      if (existing.categoryId === categoryId) {
+        delete store[key];
+      }
+    }
+
+    const created: Competitor[] = competitors.map((input) => ({
+      id: generateId(),
+      categoryId,
+      name: input.name,
+      club: input.club,
+      seed: input.seed,
+      createdAt: now,
+    }));
+
+    for (const competitor of created) {
+      store[competitor.id] = competitor;
+    }
+
+    writeStore(COMPETITORS_KEY, store);
+    return created;
   }
 }
