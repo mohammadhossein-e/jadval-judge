@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -61,6 +62,21 @@ export function BulkAddDialog({ open, onOpenChange, onAdd }: BulkAddDialogProps)
   const hasContent = valid.length > 0;
   const hasErrors = errors.length > 0;
 
+  function handleTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = text.slice(0, start) + '\t' + text.slice(end);
+    setText(next);
+    const cursor = start + 1;
+    window.setTimeout(() => {
+      el.selectionStart = cursor;
+      el.selectionEnd = cursor;
+    }, 0);
+  }
+
   function handleConfirm(): void {
     if (!hasContent) return;
     onAdd(valid);
@@ -95,6 +111,7 @@ export function BulkAddDialog({ open, onOpenChange, onAdd }: BulkAddDialogProps)
             }
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleTextareaKeyDown}
           />
         </div>
 

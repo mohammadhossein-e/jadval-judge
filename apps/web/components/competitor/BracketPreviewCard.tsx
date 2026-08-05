@@ -47,12 +47,12 @@ export function BracketPreviewCard({ preview, drawType, onGenerate }: BracketPre
         {seededByes.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground">
-              Seeded competitors receiving BYEs:
+              BYE positions in the bracket:
             </p>
             <div className="flex flex-wrap gap-2">
-              {seededByes.map((seed) => (
-                <Badge key={seed} variant="secondary">
-                  Seed {seed}
+              {seededByes.map((position) => (
+                <Badge key={position} variant="secondary">
+                  Position {position}
                 </Badge>
               ))}
             </div>

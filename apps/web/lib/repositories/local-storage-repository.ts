@@ -1,4 +1,5 @@
 import type { Tournament, Category, Competitor } from '@jadval/types';
+import type { EngineBracket } from '@jadval/bracket-engine';
 import type {
   TournamentRepository,
   CreateTournamentInput,
@@ -12,6 +13,7 @@ const STORAGE_PREFIX = 'jadval:';
 const TOURNAMENTS_KEY = `${STORAGE_PREFIX}tournaments`;
 const CATEGORIES_KEY = `${STORAGE_PREFIX}categories`;
 const COMPETITORS_KEY = `${STORAGE_PREFIX}competitors`;
+const BRACKETS_KEY = `${STORAGE_PREFIX}brackets`;
 
 function readStore<T>(key: string): Record<string, T> {
   if (typeof window === 'undefined') return {};
@@ -189,6 +191,10 @@ export class LocalStorageRepository implements TournamentRepository {
       }
     }
     writeStore(COMPETITORS_KEY, competitorStore);
+
+    const bracketStore = readStore<EngineBracket>(BRACKETS_KEY);
+    delete bracketStore[id];
+    writeStore(BRACKETS_KEY, bracketStore);
   }
 
   listCompetitors(categoryId: string): Competitor[] {
@@ -229,5 +235,22 @@ export class LocalStorageRepository implements TournamentRepository {
 
     writeStore(COMPETITORS_KEY, store);
     return created;
+  }
+
+  saveBracket(categoryId: string, bracket: EngineBracket): void {
+    const store = readStore<EngineBracket>(BRACKETS_KEY);
+    store[categoryId] = bracket;
+    writeStore(BRACKETS_KEY, store);
+  }
+
+  getBracket(categoryId: string): EngineBracket | null {
+    const store = readStore<EngineBracket>(BRACKETS_KEY);
+    return store[categoryId] ?? null;
+  }
+
+  deleteBracket(categoryId: string): void {
+    const store = readStore<EngineBracket>(BRACKETS_KEY);
+    delete store[categoryId];
+    writeStore(BRACKETS_KEY, store);
   }
 }

@@ -2,6 +2,7 @@ import type { EngineCompetitor, DrawType } from '../types';
 import { shuffleArray } from '../utils';
 
 export function standardSeeding(bracketSize: number): number[] {
+  if (bracketSize < 2) return [];
   if (bracketSize === 2) return [1, 2];
   const half = standardSeeding(bracketSize / 2);
   const result: number[] = [];

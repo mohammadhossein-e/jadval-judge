@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculateBracketInfo, getBracketPreview } from '../../src/single-elimination/byes';
-import { standardSeeding } from '../../src/single-elimination/seeding';
+import { calculateByeDistribution } from '../../src/single-elimination/bye-distribution';
+import { generateBracket } from '../../src/single-elimination/generator';
 
 describe('calculateBracketInfo', () => {
   it('returns bracketSize = competitorCount for power of 2', () => {
@@ -42,7 +43,7 @@ describe('calculateBracketInfo', () => {
 
 describe('getBracketPreview', () => {
   it('returns correct preview for power-of-2 count', () => {
-    const preview = getBracketPreview(8, [null, null, null, null, null, null, null, null]);
+    const preview = getBracketPreview(8, Array(8).fill(null));
     expect(preview.competitorCount).toBe(8);
     expect(preview.bracketSize).toBe(8);
     expect(preview.byeCount).toBe(0);
@@ -50,23 +51,58 @@ describe('getBracketPreview', () => {
     expect(preview.seededByes).toEqual([]);
   });
 
-  it('calculates seeded BYEs for non-power-of-2 count', () => {
-    const seeds = [1, null, null, null];
-    const preview = getBracketPreview(4, seeds);
-    expect(preview.competitorCount).toBe(4);
-    expect(preview.bracketSize).toBe(4);
-    expect(preview.byeCount).toBe(0);
-    expect(preview.seededByes).toEqual([]);
+  it('places BYEs at the official priority positions', () => {
+    const preview = getBracketPreview(9, Array(9).fill(null));
+    expect(preview.competitorCount).toBe(9);
+    expect(preview.bracketSize).toBe(16);
+    expect(preview.byeCount).toBe(7);
+    expect(preview.totalRounds).toBe(4);
+    expect(preview.seededByes).toEqual([0, 15, 8, 7, 12, 3, 11]);
   });
 
-  it('identifies which seeds receive BYEs', () => {
-    const competitors = 6;
-    const seeds = Array(competitors).fill(null) as (number | null)[];
-    seeds[0] = 1;
-    seeds[1] = 2;
-    const preview = getBracketPreview(competitors, seeds);
-    expect(preview.byeCount).toBe(2);
-    expect(preview.seededByes.length).toBeGreaterThanOrEqual(0);
+  it('returns the expected BYE positions for common competitor counts', () => {
+    const cases: [number, number[]][] = [
+      [3, [0]],
+      [5, [0, 7, 4]],
+      [9, [0, 15, 8, 7, 12, 3, 11]],
+      [13, [0, 15, 8]],
+      [17, [0, 31, 16, 15, 24, 7, 23, 8, 28, 3, 27, 4, 20, 11, 19]],
+    ];
+    for (const [count, expected] of cases) {
+      const preview = getBracketPreview(count, Array(count).fill(null));
+      expect(preview.seededByes).toEqual(expected);
+    }
+  });
+
+  it('matches the official BYE distribution used by the generation pipeline', () => {
+    for (const count of [2, 3, 5, 8, 13, 17, 33, 65]) {
+      const preview = getBracketPreview(count, Array(count).fill(null));
+      const distribution = calculateByeDistribution(count);
+      expect(preview.seededByes).toEqual([...distribution.byePositions]);
+    }
+  });
+
+  it('does not derive BYEs from the seeds argument', () => {
+    const seededPreview = getBracketPreview(9, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const unseededPreview = getBracketPreview(9, Array(9).fill(null));
+    expect(seededPreview.seededByes).toEqual([0, 15, 8, 7, 12, 3, 11]);
+    expect(seededPreview.seededByes).toEqual(unseededPreview.seededByes);
+  });
+
+  it('preview BYE positions match the actual generated bracket', () => {
+    for (const count of [3, 5, 9, 13, 17]) {
+      const competitors = Array.from({ length: count }, (_, i) => ({
+        id: `c${i + 1}`,
+        name: `Competitor ${i + 1}`,
+        seed: i + 1,
+      }));
+
+      const preview = getBracketPreview(count, competitors.map((c) => c.seed));
+      const { byes } = generateBracket(competitors, 'manual');
+      const actual = byes.map((b) => b.position).sort((a, b) => a - b);
+
+      expect(preview.seededByes.slice().sort((a, b) => a - b)).toEqual(actual);
+    }
   });
 
   it('returns correct totalRounds for various sizes', () => {

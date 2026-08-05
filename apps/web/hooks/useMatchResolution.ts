@@ -23,6 +23,7 @@ export interface UseMatchResolutionReturn {
 
 export function useMatchResolution(
   sourceBracket: EngineBracket | null,
+  onBracketChange?: (bracket: EngineBracket) => void,
 ): UseMatchResolutionReturn {
   const [bracket, setBracket] = useState<EngineBracket | null>(sourceBracket);
   const [prevSource, setPrevSource] = useState(sourceBracket);
@@ -54,10 +55,12 @@ export function useMatchResolution(
       setBracket((prev) => {
         const current = prev ?? sourceBracket;
         if (!current) return prev;
-        return resolveMatch(current, matchId, winnerId);
+        const next = resolveMatch(current, matchId, winnerId);
+        onBracketChange?.(next);
+        return next;
       });
     },
-    [sourceBracket],
+    [sourceBracket, onBracketChange],
   );
 
   const undoMatch = useCallback(
@@ -65,10 +68,12 @@ export function useMatchResolution(
       setBracket((prev) => {
         const current = prev ?? sourceBracket;
         if (!current) return prev;
-        return cascadeUndo(current, matchId);
+        const next = cascadeUndo(current, matchId);
+        onBracketChange?.(next);
+        return next;
       });
     },
-    [sourceBracket],
+    [sourceBracket, onBracketChange],
   );
 
   const canResolveMatch = useCallback(

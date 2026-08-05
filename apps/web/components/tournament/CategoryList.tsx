@@ -21,7 +21,6 @@ interface CategoryListProps {
   categories: CategoryItem[];
   onEdit: (id: string) => void;
   onRemove: (id: string) => void;
-  requiresDeleteConfirmation?: (id: string) => boolean;
 }
 
 function formatTags(
@@ -36,7 +35,7 @@ function formatTags(
   return tags;
 }
 
-export function CategoryList({ categories, onEdit, onRemove, requiresDeleteConfirmation }: CategoryListProps) {
+export function CategoryList({ categories, onEdit, onRemove }: CategoryListProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   if (categories.length === 0) {
@@ -48,8 +47,6 @@ export function CategoryList({ categories, onEdit, onRemove, requiresDeleteConfi
       />
     );
   }
-
-  const pendingCategory = categories.find((c) => c.id === pendingDeleteId);
 
   return (
     <>
@@ -89,13 +86,7 @@ export function CategoryList({ categories, onEdit, onRemove, requiresDeleteConfi
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  onClick={() => {
-                    if (requiresDeleteConfirmation?.(category.id)) {
-                      setPendingDeleteId(category.id);
-                    } else {
-                      onRemove(category.id);
-                    }
-                  }}
+                  onClick={() => setPendingDeleteId(category.id)}
                 >
                   <Trash2 />
                   <span className="sr-only">Remove category</span>
@@ -111,11 +102,10 @@ export function CategoryList({ categories, onEdit, onRemove, requiresDeleteConfi
         onOpenChange={(open) => {
           if (!open) setPendingDeleteId(null);
         }}
-        title="Remove category"
-        description={
-          pendingCategory ? `Are you sure you want to remove "${pendingCategory.name}"?` : ''
-        }
-        confirmText="Remove"
+        title="Delete this category?"
+        description="This will permanently remove the category and all of its competitors. This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
         variant="destructive"
         onConfirm={() => {
           if (pendingDeleteId) {

@@ -7,6 +7,7 @@ import type {
   AgeGroup,
   BeltLevel,
 } from '@jadval/types';
+import type { EngineBracket } from '@jadval/bracket-engine';
 
 export interface CreateTournamentInput {
   name: string;
@@ -56,4 +57,7 @@ export interface TournamentRepository {
   deleteCategory(id: string): void;
   listCompetitors(categoryId: string): Competitor[];
   setCompetitors(categoryId: string, competitors: CreateCompetitorInput[]): Competitor[];
+  saveBracket(categoryId: string, bracket: EngineBracket): void;
+  getBracket(categoryId: string): EngineBracket | null;
+  deleteBracket(categoryId: string): void;
 }

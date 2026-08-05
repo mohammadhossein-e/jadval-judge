@@ -26,8 +26,8 @@ describe('generateBracket', () => {
       expect(() => generateBracket([makeCompetitors(1)[0]])).toThrow('At least 2');
     });
 
-    it('throws for more than 128 competitors', () => {
-      expect(() => generateBracket(makeCompetitors(129))).toThrow('Maximum 128');
+    it('throws for more than 256 competitors', () => {
+      expect(() => generateBracket(makeCompetitors(257))).toThrow('Maximum 256');
     });
   });
 

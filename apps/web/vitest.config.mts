@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['lib/**/*.test.ts', 'hooks/**/*.test.ts'],
+    include: ['lib/**/*.test.ts', 'hooks/**/*.test.ts', 'app/**/*.test.tsx', 'components/**/*.test.tsx'],
     environment: 'jsdom',
   },
 });

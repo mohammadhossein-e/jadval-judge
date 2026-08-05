@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CompetitorForm, type CompetitorFormData } from '@/components/competitor/CompetitorForm';
 import { CompetitorList } from '@/components/competitor/CompetitorList';
 import { RandomDrawCard, type DrawStatus } from '@/components/competitor/RandomDrawCard';
@@ -21,6 +22,7 @@ import {
 } from '@/lib/draw';
 import { getRepository } from '@/lib/repositories';
 import type { Competitor } from '@jadval/types';
+import type { EngineBracket } from '@jadval/bracket-engine';
 import type { CreateCompetitorInput } from '@/lib/repositories';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,11 +42,13 @@ export function CategoryCompetitorsManager({
   categoryName = 'Category',
 }: CategoryCompetitorsManagerProps) {
   const [competitors, setCompetitorsState] = useState<Competitor[]>([]);
+  const [hydratedBracket, setHydratedBracket] = useState<EngineBracket | null>(null);
 
   const [prevCategoryId, setPrevCategoryId] = useState<string | null>(null);
   if (categoryId !== prevCategoryId) {
     setPrevCategoryId(categoryId);
     setCompetitorsState(getRepository().listCompetitors(categoryId));
+    setHydratedBracket(getRepository().getBracket(categoryId));
   }
 
   const setCompetitors = useCallback(
@@ -58,6 +62,7 @@ export function CategoryCompetitorsManager({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [showRegenDialog, setShowRegenDialog] = useState(false);
   const [drawType, setDrawType] = useState<'random' | 'manual'>('random');
   const [randomDrawStatus, setRandomDrawStatus] = useState<DrawStatus>({
     hasDraw: false,
@@ -86,12 +91,15 @@ export function CategoryCompetitorsManager({
     preview,
     generate,
     reset,
-  } = useBracketGeneration(competitors, drawType);
+  } = useBracketGeneration(competitors, drawType, hydratedBracket);
 
   const [prevSignature, setPrevSignature] = useState(competitorSignature);
   if (competitorSignature !== prevSignature) {
     setPrevSignature(competitorSignature);
     setRandomDrawStatus({ hasDraw: false, drawResult: null });
+    getRepository().deleteBracket(categoryId);
+    setHydratedBracket(null);
+    reset();
   }
 
   const [prevDrawType, setPrevDrawType] = useState(drawType);
@@ -192,7 +200,7 @@ export function CategoryCompetitorsManager({
     setManualDrawStatus(status);
   }, []);
 
-  const handleGenerate = useCallback(() => {
+  const performGenerate = useCallback(() => {
     if (competitors.length < MIN_COMPETITORS_FOR_BRACKET) {
       toast.error('At least 2 competitors required');
       return;
@@ -215,12 +223,28 @@ export function CategoryCompetitorsManager({
     }
 
     try {
-      generate(placements);
+      const generatedBracket = generate(placements);
+      getRepository().saveBracket(categoryId, generatedBracket);
       toast.success('Bracket generated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate bracket');
     }
-  }, [competitors.length, drawType, randomDrawStatus, manualDrawStatus, generate]);
+  }, [competitors.length, drawType, randomDrawStatus, manualDrawStatus, generate, categoryId]);
+
+  const handleGenerateClick = useCallback(() => {
+    if (isGenerated) {
+      setShowRegenDialog(true);
+    } else {
+      performGenerate();
+    }
+  }, [isGenerated, performGenerate]);
+
+  const handleBracketChange = useCallback(
+    (bracket: EngineBracket) => {
+      getRepository().saveBracket(categoryId, bracket);
+    },
+    [categoryId],
+  );
 
   const {
     bracket: resolvedBracket,
@@ -230,15 +254,16 @@ export function CategoryCompetitorsManager({
     undoMatch,
     canResolveMatch,
     canUndoMatch,
-  } = useMatchResolution(bracket);
+  } = useMatchResolution(bracket, handleBracketChange);
 
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
 
   const handleResetBracket = useCallback(() => {
     reset();
     setSelectedMatchId(null);
+    getRepository().deleteBracket(categoryId);
     toast.success('Bracket reset');
-  }, [reset]);
+  }, [reset, categoryId]);
 
   const editingCompetitor = editingId
     ? competitors.find((c) => c.id === editingId)
@@ -335,11 +360,11 @@ export function CategoryCompetitorsManager({
         </>
       )}
 
-      {competitors.length >= MIN_COMPETITORS_FOR_BRACKET && isDrawReady && !isGenerated && (
+      {competitors.length >= MIN_COMPETITORS_FOR_BRACKET && isDrawReady && (
         <BracketPreviewCard
           preview={preview}
           drawType={drawType}
-          onGenerate={handleGenerate}
+          onGenerate={handleGenerateClick}
         />
       )}
 
@@ -362,6 +387,19 @@ export function CategoryCompetitorsManager({
         open={showBulkDialog}
         onOpenChange={setShowBulkDialog}
         onAdd={handleBulkAdd}
+      />
+
+      <ConfirmDialog
+        open={showRegenDialog}
+        onOpenChange={setShowRegenDialog}
+        title="Regenerate Bracket?"
+        description="A bracket has already been generated. Regenerating it will discard all recorded match results. Continue?"
+        confirmText="Regenerate"
+        cancelText="Cancel"
+        onConfirm={() => {
+          setShowRegenDialog(false);
+          performGenerate();
+        }}
       />
     </div>
   );

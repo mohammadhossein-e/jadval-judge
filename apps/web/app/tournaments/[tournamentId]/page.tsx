@@ -13,7 +13,7 @@ export default function TournamentDashboardPage({
 }: {
   params: Promise<{ tournamentId: string }>;
 }) {
-  const [data, setData] = useState<{ tournament: Tournament; categories: Category[] } | null>(
+  const [data, setData] = useState<{ tournament: Tournament; categories: Category[] } | 'not-found' | null>(
     null,
   );
 
@@ -23,12 +23,26 @@ export default function TournamentDashboardPage({
       const t = repo.getTournament(tournamentId);
       if (t) {
         setData({ tournament: t, categories: repo.listCategories(t.id) });
+      } else {
+        setData('not-found');
       }
     });
   }, [params]);
 
-  if (!data) {
+  if (data === null) {
     return <div className="text-muted-foreground p-6">Loading...</div>;
+  }
+
+  if (data === 'not-found') {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">Tournament not found</h1>
+        <p className="text-muted-foreground">The tournament you are looking for does not exist.</p>
+        <Link href="/tournaments">
+          <Button>Back to Tournaments</Button>
+        </Link>
+      </div>
+    );
   }
 
   const { tournament, categories } = data;

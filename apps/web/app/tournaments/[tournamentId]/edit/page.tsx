@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,7 @@ export default function EditTournamentPage({
   params: Promise<{ tournamentId: string }>;
 }) {
   const router = useRouter();
-  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [tournament, setTournament] = useState<Tournament | 'not-found' | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
@@ -40,12 +41,26 @@ export default function EditTournamentPage({
         setDate(t.date);
         setOrganization(t.organization ?? '');
         setCategories(repo.listCategories(id));
+      } else {
+        setTournament('not-found');
       }
     });
   }, [params]);
 
-  if (!tournament) {
+  if (tournament === null) {
     return <div className="text-muted-foreground p-6">Loading...</div>;
+  }
+
+  if (tournament === 'not-found') {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">Tournament not found</h1>
+        <p className="text-muted-foreground">The tournament you are looking for does not exist.</p>
+        <Link href="/tournaments">
+          <Button>Back to Tournaments</Button>
+        </Link>
+      </div>
+    );
   }
 
   const isFormDirty =
@@ -94,11 +109,6 @@ export default function EditTournamentPage({
     setCategories((prev) => prev.filter((c) => c.id !== id));
     if (editingCategoryId === id) setEditingCategoryId(null);
     toast.success('Category removed');
-  }
-
-  function requiresDeleteConfirmation(id: string) {
-    const cat = categories.find((c) => c.id === id);
-    return !!cat && cat.status !== 'SETUP';
   }
 
   const editingCategory = editingCategoryId
@@ -172,7 +182,6 @@ export default function EditTournamentPage({
             }))}
             onEdit={(id) => setEditingCategoryId(id)}
             onRemove={handleRemoveCategory}
-            requiresDeleteConfirmation={requiresDeleteConfirmation}
           />
 
           {editingCategory && (

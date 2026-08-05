@@ -16,7 +16,7 @@ export interface UseBracketGenerationReturn {
   byes: GenerationResult['byes'];
   isGenerated: boolean;
   preview: BracketPreview;
-  generate: (placements?: Map<number, string>) => void;
+  generate: (placements?: Map<number, string>) => EngineBracket;
   reset: () => void;
 }
 
@@ -27,8 +27,11 @@ function toEngineCompetitor(c: CompetitorInput): EngineCompetitor {
 export function useBracketGeneration(
   competitors: readonly CompetitorInput[],
   drawType: 'random' | 'manual',
+  initialBracket: EngineBracket | null = null,
 ): UseBracketGenerationReturn {
-  const [result, setResult] = useState<GenerationResult | null>(null);
+  const [result, setResult] = useState<GenerationResult | null>(() =>
+    initialBracket ? { bracket: initialBracket, byes: [] } : null,
+  );
 
   const engineCompetitors = useMemo(
     () => competitors.map(toEngineCompetitor),
@@ -46,9 +49,10 @@ export function useBracketGeneration(
   );
 
   const generate = useCallback(
-    (placements?: Map<number, string>) => {
+    (placements?: Map<number, string>): EngineBracket => {
       const genResult = generateBracket(engineCompetitors, drawType, placements);
       setResult(genResult);
+      return genResult.bracket;
     },
     [engineCompetitors, drawType],
   );

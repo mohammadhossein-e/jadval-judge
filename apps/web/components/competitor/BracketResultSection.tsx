@@ -1,9 +1,10 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Crown } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import type { EngineBracket, EngineCompetitor } from '@jadval/bracket-engine';
 import { BracketView } from '@/components/competitor/BracketView';
+import { ChampionBanner } from '@/components/competitor/ChampionBanner';
 
 interface BracketResultSectionProps {
   bracket: EngineBracket;
@@ -38,16 +39,7 @@ export function BracketResultSection({
           Reset Bracket
         </Button>
       </div>
-      {isComplete && champion && (
-        <div className="flex items-center justify-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
-          <Crown className="size-8 text-yellow-500" />
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">Champion</p>
-            <p className="text-xl font-bold">{champion.name}</p>
-          </div>
-          <Crown className="size-8 text-yellow-500" />
-        </div>
-      )}
+      <ChampionBanner champion={champion} isComplete={isComplete} />
       <BracketView
         bracket={bracket}
         selectedMatchId={selectedMatchId}
