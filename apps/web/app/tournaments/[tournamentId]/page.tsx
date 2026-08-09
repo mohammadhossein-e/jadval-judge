@@ -2,20 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getRepository } from '@/lib/repositories';
 import type { Tournament, Category } from '@jadval/types';
+import { Trash2 } from 'lucide-react';
 
 export default function TournamentDashboardPage({
   params,
 }: {
   params: Promise<{ tournamentId: string }>;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<{ tournament: Tournament; categories: Category[] } | 'not-found' | null>(
     null,
   );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     params.then(({ tournamentId }) => {
@@ -28,6 +34,18 @@ export default function TournamentDashboardPage({
       }
     });
   }, [params]);
+
+  function handleDeleteTournament() {
+    if (data === null || data === 'not-found') return;
+    try {
+      getRepository().deleteTournament(data.tournament.id);
+      setShowDeleteDialog(false);
+      toast.success('Tournament deleted');
+      router.push('/tournaments');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete tournament');
+    }
+  }
 
   if (data === null) {
     return <div className="text-muted-foreground p-6">Loading...</div>;
@@ -61,6 +79,10 @@ export default function TournamentDashboardPage({
           <Link href={`/tournaments/${tournament.id}/edit`}>
             <Button variant="outline">Edit Tournament</Button>
           </Link>
+          <Button type="button" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="size-4" />
+            Delete Tournament
+          </Button>
         </div>
       </div>
 
@@ -92,6 +114,17 @@ export default function TournamentDashboardPage({
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Delete Tournament?"
+        description="This will permanently delete this tournament and its categories, competitors, and tournament data."
+        confirmText="Delete Tournament"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={handleDeleteTournament}
+      />
     </div>
   );
 }

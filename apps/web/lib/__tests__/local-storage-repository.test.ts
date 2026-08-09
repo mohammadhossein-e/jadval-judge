@@ -132,6 +132,83 @@ describe('LocalStorageRepository — competitors', () => {
     });
   });
 
+  describe('deleteTournament cascade', () => {
+    function createTournament(name: string, categories: { name: string }[]) {
+      return repo.createTournament({
+        name,
+        date: '2026-01-01',
+        organization: null,
+        tournamentType: 'kata',
+        categories: categories.map((c) => ({ ...c, gender: null, ageGroup: null, beltLevel: null })),
+      });
+    }
+
+    it('deletes only the selected tournament', () => {
+      const t1 = createTournament('Spring Open', [{ name: 'Cat A' }]);
+      const t2 = createTournament('Fall Open', [{ name: 'Cat B' }]);
+
+      repo.deleteTournament(t1.id);
+
+      expect(repo.getTournament(t1.id)).toBeNull();
+      expect(repo.getTournament(t2.id)).not.toBeNull();
+      expect(repo.listTournaments().map((t) => t.id)).not.toContain(t1.id);
+      expect(repo.listTournaments().map((t) => t.id)).toContain(t2.id);
+    });
+
+    it('removes categories belonging to the deleted tournament and keeps others', () => {
+      const t1 = createTournament('Spring Open', [{ name: 'Cat A' }, { name: 'Cat B' }]);
+      const t2 = createTournament('Fall Open', [{ name: 'Cat C' }]);
+
+      repo.deleteTournament(t1.id);
+
+      expect(repo.listCategories(t1.id)).toEqual([]);
+      expect(repo.listCategories(t2.id)).toHaveLength(1);
+      expect(repo.listCategories(t2.id)[0].name).toBe('Cat C');
+    });
+
+    it('removes competitors of the deleted tournament and keeps others', () => {
+      const t1 = createTournament('Spring Open', [{ name: 'Cat A' }]);
+      const t2 = createTournament('Fall Open', [{ name: 'Cat B' }]);
+      const t1Cat = repo.listCategories(t1.id)[0];
+      const t2Cat = repo.listCategories(t2.id)[0];
+      repo.setCompetitors(t1Cat.id, [{ name: 'Alice', club: 'Tokyo', seed: 1 }]);
+      repo.setCompetitors(t2Cat.id, [
+        { name: 'Bob', club: 'Osaka', seed: null },
+        { name: 'Carol', club: 'Kyoto', seed: 2 },
+      ]);
+
+      repo.deleteTournament(t1.id);
+
+      expect(repo.listCompetitors(t1Cat.id)).toEqual([]);
+      expect(repo.listCompetitors(t2Cat.id)).toHaveLength(2);
+    });
+
+    it('removes bracket/draw state for the deleted tournament and keeps others', () => {
+      const t1 = createTournament('Spring Open', [{ name: 'Cat A' }]);
+      const t2 = createTournament('Fall Open', [{ name: 'Cat B' }]);
+      const t1Cat = repo.listCategories(t1.id)[0];
+      const t2Cat = repo.listCategories(t2.id)[0];
+      repo.saveBracket(t1Cat.id, { size: 4, totalRounds: 2, matches: [] });
+      repo.saveBracket(t2Cat.id, { size: 8, totalRounds: 3, matches: [] });
+
+      repo.deleteTournament(t1.id);
+
+      expect(repo.getBracket(t1Cat.id)).toBeNull();
+      expect(repo.getBracket(t2Cat.id)).not.toBeNull();
+    });
+
+    it('deleted tournament does not reappear after a fresh persistence read', () => {
+      const t1 = createTournament('Spring Open', [{ name: 'Cat A' }]);
+      repo.deleteTournament(t1.id);
+
+      expect(repo.getTournament(t1.id)).toBeNull();
+      expect(repo.listTournaments().some((t) => t.id === t1.id)).toBe(false);
+    });
+
+    it('throws when the tournament does not exist', () => {
+      expect(() => repo.deleteTournament('nonexistent')).toThrow();
+    });
+  });
   describe('saveBracket / getBracket / deleteBracket', () => {
     it('returns null for category with no saved bracket', () => {
       expect(repo.getBracket('cat-1')).toBeNull();

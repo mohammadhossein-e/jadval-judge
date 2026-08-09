@@ -197,6 +197,40 @@ export class LocalStorageRepository implements TournamentRepository {
     writeStore(BRACKETS_KEY, bracketStore);
   }
 
+  deleteTournament(id: string): void {
+    const tournamentStore = readStore<Tournament>(TOURNAMENTS_KEY);
+    if (!tournamentStore[id]) {
+      throw new Error(`Tournament ${id} not found`);
+    }
+    delete tournamentStore[id];
+    writeStore(TOURNAMENTS_KEY, tournamentStore);
+
+    const categoryStore = readStore<Category>(CATEGORIES_KEY);
+    const deletedCategoryIds: string[] = [];
+    for (const [key, category] of Object.entries(categoryStore)) {
+      if (category.tournamentId === id) {
+        delete categoryStore[key];
+        deletedCategoryIds.push(key);
+      }
+    }
+    writeStore(CATEGORIES_KEY, categoryStore);
+
+    const deletedCategoryIdSet = new Set(deletedCategoryIds);
+    const competitorStore = readStore<Competitor>(COMPETITORS_KEY);
+    for (const [key, competitor] of Object.entries(competitorStore)) {
+      if (deletedCategoryIdSet.has(competitor.categoryId)) {
+        delete competitorStore[key];
+      }
+    }
+    writeStore(COMPETITORS_KEY, competitorStore);
+
+    const bracketStore = readStore<EngineBracket>(BRACKETS_KEY);
+    for (const categoryId of deletedCategoryIds) {
+      delete bracketStore[categoryId];
+    }
+    writeStore(BRACKETS_KEY, bracketStore);
+  }
+
   listCompetitors(categoryId: string): Competitor[] {
     const store = readStore<Competitor>(COMPETITORS_KEY);
     return Object.values(store)

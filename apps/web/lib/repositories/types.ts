@@ -55,6 +55,7 @@ export interface TournamentRepository {
   createCategory(tournamentId: string, input: CreateCategoryInput): Category;
   updateCategory(id: string, input: UpdateCategoryInput): Category;
   deleteCategory(id: string): void;
+  deleteTournament(id: string): void;
   listCompetitors(categoryId: string): Competitor[];
   setCompetitors(categoryId: string, competitors: CreateCompetitorInput[]): Competitor[];
   saveBracket(categoryId: string, bracket: EngineBracket): void;
