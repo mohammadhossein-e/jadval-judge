@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -24,7 +24,7 @@ import { getRepository } from '@/lib/repositories';
 import type { Competitor } from '@jadval/types';
 import type { EngineBracket } from '@jadval/bracket-engine';
 import type { CreateCompetitorInput } from '@/lib/repositories';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MAX_COMPETITORS = 128;
@@ -63,6 +63,7 @@ export function CategoryCompetitorsManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [showRegenDialog, setShowRegenDialog] = useState(false);
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
   const [drawType, setDrawType] = useState<'random' | 'manual'>('random');
   const [randomDrawStatus, setRandomDrawStatus] = useState<DrawStatus>({
     hasDraw: false,
@@ -146,6 +147,13 @@ export function CategoryCompetitorsManager({
     setEditingId((eid) => (eid === id ? null : eid));
     toast.success('Competitor removed');
   }, [competitors, setCompetitors]);
+
+  const handleDeleteAll = useCallback(() => {
+    setEditingId(null);
+    setShowAddForm(false);
+    setCompetitors([]);
+    toast.success('All competitors removed');
+  }, [setCompetitors]);
 
   const handleMoveUp = useCallback((id: string) => {
     const idx = competitors.findIndex((c) => c.id === id);
@@ -265,10 +273,6 @@ export function CategoryCompetitorsManager({
     toast.success('Bracket reset');
   }, [reset, categoryId]);
 
-  const editingCompetitor = editingId
-    ? competitors.find((c) => c.id === editingId)
-    : undefined;
-
   void tournamentId;
 
   return (
@@ -286,32 +290,30 @@ export function CategoryCompetitorsManager({
           <CardDescription>
             {competitors.length} / {MAX_COMPETITORS} competitors registered
           </CardDescription>
+          <CardAction>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={competitors.length === 0}
+              onClick={() => setShowDeleteAllDialog(true)}
+            >
+              <Trash2 className="size-4" />
+              Delete All
+            </Button>
+          </CardAction>
         </CardHeader>
         <CardContent className="space-y-4">
           <CompetitorList
             competitors={competitors}
+            editingId={editingId}
+            existingNames={existingNames}
             onEdit={(id) => setEditingId(id)}
+            onEditSave={handleEdit}
+            onEditCancel={() => setEditingId(null)}
             onRemove={handleRemove}
             onMoveUp={handleMoveUp}
             onMoveDown={handleMoveDown}
           />
-
-          {editingCompetitor && (
-            <>
-              <Separator />
-              <CompetitorForm
-                initialData={{
-                  name: editingCompetitor.name,
-                  club: editingCompetitor.club,
-                  seed: editingCompetitor.seed,
-                }}
-                existingNames={existingNames}
-                onSubmit={handleEdit}
-                onCancel={() => setEditingId(null)}
-                submitLabel="Save Changes"
-              />
-            </>
-          )}
 
           {showAddForm && !editingId && (
             <>
@@ -399,6 +401,20 @@ export function CategoryCompetitorsManager({
         onConfirm={() => {
           setShowRegenDialog(false);
           performGenerate();
+        }}
+      />
+
+      <ConfirmDialog
+        open={showDeleteAllDialog}
+        onOpenChange={setShowDeleteAllDialog}
+        title="Delete all competitors?"
+        description="This will remove ALL competitors from this category. This action cannot be undone."
+        confirmText="Delete All"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          setShowDeleteAllDialog(false);
+          handleDeleteAll();
         }}
       />
     </div>
