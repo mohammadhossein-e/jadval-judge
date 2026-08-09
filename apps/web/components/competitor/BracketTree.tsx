@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { EngineBracket, EngineMatch } from '@jadval/bracket-engine';
 import { getRoundLabel } from '@/lib/bracket-labels';
 import { TreeMatch } from './TreeMatch';
+import { ZoomableBracket } from './ZoomableBracket';
 
 const MATCH_HEIGHT = 80;
 const MATCH_GAP = 20;
@@ -183,85 +184,91 @@ export function BracketTree({
 
   const isFinalRound = (round: number) => round === bracket.totalRounds;
 
+  const contentWidth = useMemo(
+    () => rounds.length * MATCH_WIDTH + Math.max(0, rounds.length - 1) * CONNECTOR_WIDTH,
+    [rounds],
+  );
+
   return (
     <div
-      className="flex items-start overflow-x-auto overflow-y-auto pb-4"
+      className="relative"
       style={{
-        maxHeight: '80vh',
         ['--bracket-match-height' as string]: `${MATCH_HEIGHT}px`,
         ['--bracket-match-width' as string]: `${MATCH_WIDTH}px`,
         ['--bracket-connector-width' as string]: `${CONNECTOR_WIDTH}px`,
       }}
     >
-      {rounds.map((roundData, i) => (
-        <div
-          key={roundData.round}
-          className="flex items-start shrink-0"
-          style={{ gap: `${ROUND_SPACING}px` }}
-        >
-          {/* Round column */}
-          <div className="flex flex-col items-center shrink-0">
-            <h3
-              className={`text-center whitespace-nowrap px-2 mb-3 ${
-                isFinalRound(roundData.round)
-                  ? 'text-sm font-bold text-foreground'
-                  : 'text-xs font-semibold text-muted-foreground'
-              }`}
-            >
-              {getRoundLabel(roundData.round, bracket.totalRounds)}
-            </h3>
-            <div
-              className="relative shrink-0"
-              style={{
-                width: `${MATCH_WIDTH}px`,
-                minHeight: `${totalHeight - 32}px`,
-              }}
-            >
-              {roundData.matches.map((match) => {
-                const top = roundData.positions.get(match.id) ?? 0;
-                return (
-                  <div
-                    key={match.id}
-                    className="absolute left-0 z-10"
-                    style={{ top: `${top}px` }}
-                  >
-                    <TreeMatch
-                      match={match}
-                      isSelected={match.id === selectedMatchId}
-                      isResolvable={canResolveMatch(match.id)}
-                      isUndoable={canUndoMatch(match.id)}
-                      isFinal={isFinalRound(roundData.round)}
-                      onSelect={() => onSelectMatch(match.id)}
-                      onUndo={(e) => {
-                        e.stopPropagation();
-                        onUndoMatch(match.id);
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Connector column */}
-          {i < rounds.length - 1 && (
-            <div className="relative shrink-0 z-0" style={{ width: `${CONNECTOR_WIDTH}px` }}>
+      <ZoomableBracket contentWidth={contentWidth} contentHeight={totalHeight}>
+        {rounds.map((roundData, i) => (
+          <div
+            key={roundData.round}
+            className="flex items-start shrink-0"
+            style={{ gap: `${ROUND_SPACING}px` }}
+          >
+            {/* Round column */}
+            <div className="flex flex-col items-center shrink-0">
+              <h3
+                className={`text-center whitespace-nowrap px-2 mb-3 ${
+                  isFinalRound(roundData.round)
+                    ? 'text-sm font-bold text-foreground'
+                    : 'text-xs font-semibold text-muted-foreground'
+                }`}
+              >
+                {getRoundLabel(roundData.round, bracket.totalRounds)}
+              </h3>
               <div
-                className="relative"
+                className="relative shrink-0"
                 style={{
-                  width: `${CONNECTOR_WIDTH}px`,
+                  width: `${MATCH_WIDTH}px`,
                   minHeight: `${totalHeight - 32}px`,
                 }}
               >
-                <ConnectorColumn
-                  leftRound={roundData}
-                  rightRound={rounds[i + 1]}
-                />
+                {roundData.matches.map((match) => {
+                  const top = roundData.positions.get(match.id) ?? 0;
+                  return (
+                    <div
+                      key={match.id}
+                      className="absolute left-0 z-10"
+                      style={{ top: `${top}px` }}
+                    >
+                      <TreeMatch
+                        match={match}
+                        isSelected={match.id === selectedMatchId}
+                        isResolvable={canResolveMatch(match.id)}
+                        isUndoable={canUndoMatch(match.id)}
+                        isFinal={isFinalRound(roundData.round)}
+                        onSelect={() => onSelectMatch(match.id)}
+                        onUndo={(e) => {
+                          e.stopPropagation();
+                          onUndoMatch(match.id);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </div>
-      ))}
+
+            {/* Connector column */}
+            {i < rounds.length - 1 && (
+              <div className="relative shrink-0 z-0" style={{ width: `${CONNECTOR_WIDTH}px` }}>
+                <div
+                  className="relative"
+                  style={{
+                    width: `${CONNECTOR_WIDTH}px`,
+                    minHeight: `${totalHeight - 32}px`,
+                  }}
+                >
+                  <ConnectorColumn
+                    leftRound={roundData}
+                    rightRound={rounds[i + 1]}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </ZoomableBracket>
     </div>
   );
 }
