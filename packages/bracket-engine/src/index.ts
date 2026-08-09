@@ -25,6 +25,16 @@ export type { GenerationContext } from './engine';
 export { buildGenerationContext } from './engine';
 export type { ByePlacementStrategy } from './engine';
 export type { CompetitorPlacementStrategy, PlacementInput } from './engine';
+export type { PlacementFilter } from './engine';
+export type {
+  PlacementClaim,
+  PlacementClaims,
+  PlacementPriority,
+  PlacementRule,
+  PlacementRuleInput,
+} from './engine';
+export type { SeedPlacementInput, SeedPlacementStrategy } from './engine';
+export { resolvePlacementClaims } from './engine';
 export type { PipelineContext, PipelineStep } from './engine';
 export { GenerationPipeline, createPipelineContext } from './engine';
 export {
@@ -33,6 +43,10 @@ export {
   UniqueIdsValidator,
   NonEmptyNamesValidator,
   RequiredFieldsValidator,
+  DuplicateSeedsValidator,
+  InvalidSeedValuesValidator,
+  SeededCountValidator,
+  validateSeeds,
   NonEmptyMatchIdValidator,
   NonEmptyWinnerIdValidator,
   defaultGenerateValidators,
@@ -42,5 +56,15 @@ export { SingleEliminationStrategy } from './single-elimination';
 export type { SingleEliminationStrategyConfig } from './single-elimination';
 export { DefaultByePlacementStrategy } from './single-elimination';
 export { generateByePriority } from './single-elimination';
-export { DefaultCompetitorPlacementStrategy } from './single-elimination';
+export {
+  DefaultCompetitorPlacementStrategy,
+} from './single-elimination';
+export type { DefaultCompetitorPlacementConfig } from './single-elimination';
 export { BalancedByePlacementStrategy } from './single-elimination';
+export { computeSeedClaims, DefaultSeedPlacementStrategy } from './single-elimination';
+export {
+  ManualPlacementRule,
+  FilterPlacementRule,
+  SeedPlacementRule,
+  ByePlacementRule,
+} from './single-elimination';

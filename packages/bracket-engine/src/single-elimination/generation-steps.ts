@@ -61,6 +61,7 @@ export function createCompetitorPlacementStep(
         byePositions: context.byePositions,
         drawType: context.drawType,
         manualPlacements: context.manualPlacements,
+        placementOrder: context.placementOrder,
       });
 
       return { ...context, placements };

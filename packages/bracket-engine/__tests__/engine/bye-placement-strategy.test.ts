@@ -25,7 +25,7 @@ function makeCompetitors(count: number): EngineCompetitor[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `c${i + 1}`,
     name: `Competitor ${i + 1}`,
-    seed: i + 1,
+    seed: null,
   }));
 }
 

@@ -7,6 +7,12 @@ export interface GenerateInput {
   competitors: readonly EngineCompetitor[];
   drawType: DrawType;
   manualPlacements?: Map<number, string>;
+  /**
+   * Ordered competitor ids produced by a random draw. This is a
+   * placement ORDER only — it never creates placement claims and only
+   * defines the order in which remaining competitors fill free positions.
+   */
+  placementOrder?: readonly string[];
 }
 
 /**

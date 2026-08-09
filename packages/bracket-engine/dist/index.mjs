@@ -37,11 +37,12 @@ function buildGenerationContext(competitors) {
 }
 
 // src/engine/pipeline.ts
-function createPipelineContext(competitors, drawType, manualPlacements, context) {
+function createPipelineContext(competitors, drawType, manualPlacements, placementOrder, context) {
   return {
     competitors,
     drawType,
     manualPlacements,
+    placementOrder,
     generationContext: context ?? buildGenerationContext(competitors),
     skeleton: null,
     positionMap: null,
@@ -63,6 +64,144 @@ var GenerationPipeline = class {
       current = step.execute(current);
     }
     return current;
+  }
+};
+
+// src/engine/validators/generate.ts
+var MinimumCompetitorsValidator = class {
+  validate(input) {
+    if (input.competitors.length < 2) {
+      return { valid: false, errors: ["At least 2 competitors are required"] };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var MaximumCompetitorsValidator = class {
+  validate(input) {
+    if (input.competitors.length > 256) {
+      return { valid: false, errors: ["Maximum 256 competitors allowed"] };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var UniqueIdsValidator = class {
+  validate(input) {
+    const seen = /* @__PURE__ */ new Set();
+    const duplicates = [];
+    for (const c of input.competitors) {
+      if (seen.has(c.id)) {
+        duplicates.push(c.id);
+      }
+      seen.add(c.id);
+    }
+    if (duplicates.length > 0) {
+      return {
+        valid: false,
+        errors: [`Duplicate competitor IDs: ${[...new Set(duplicates)].join(", ")}`]
+      };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var NonEmptyNamesValidator = class {
+  validate(input) {
+    const errors = [];
+    for (const c of input.competitors) {
+      if (typeof c.name !== "string" || c.name.trim() === "") {
+        errors.push(`Competitor "${c.id}" has empty or missing name`);
+      }
+    }
+    if (errors.length > 0) {
+      return { valid: false, errors };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var DuplicateSeedsValidator = class {
+  validate(input) {
+    const bySeed = /* @__PURE__ */ new Map();
+    for (const c of input.competitors) {
+      if (c.seed === null) continue;
+      const ids = bySeed.get(c.seed) ?? [];
+      ids.push(c.id);
+      bySeed.set(c.seed, ids);
+    }
+    const duplicates = [...bySeed.entries()].filter(([, ids]) => ids.length > 1);
+    if (duplicates.length > 0) {
+      return {
+        valid: false,
+        errors: duplicates.map(
+          ([seed, ids]) => `Duplicate seed ${seed} assigned to competitors: ${ids.join(", ")}`
+        )
+      };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var InvalidSeedValuesValidator = class {
+  validate(input) {
+    const errors = [];
+    for (const c of input.competitors) {
+      if (c.seed === null) continue;
+      if (!Number.isInteger(c.seed) || c.seed <= 0) {
+        errors.push(
+          `Competitor "${c.id}" has invalid seed ${String(c.seed)}: seeds must be positive integers`
+        );
+      }
+    }
+    if (errors.length > 0) {
+      return { valid: false, errors };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+var SeededCountValidator = class {
+  validate(input) {
+    const seedCount = input.competitors.reduce(
+      (count, c) => c.seed === null ? count : count + 1,
+      0
+    );
+    if (seedCount > input.competitors.length) {
+      return {
+        valid: false,
+        errors: [
+          `Seed count (${seedCount}) exceeds competitor count (${input.competitors.length})`
+        ]
+      };
+    }
+    return { valid: true, errors: [] };
+  }
+};
+function validateSeeds(input) {
+  const validators = [
+    new DuplicateSeedsValidator(),
+    new InvalidSeedValuesValidator(),
+    new SeededCountValidator()
+  ];
+  const errors = [];
+  for (const validator of validators) {
+    const result = validator.validate(input);
+    if (!result.valid) {
+      errors.push(...result.errors);
+    }
+  }
+  return errors;
+}
+var RequiredFieldsValidator = class {
+  validate(input) {
+    const errors = [];
+    for (const c of input.competitors) {
+      if (typeof c.id !== "string" || c.id === "") {
+        errors.push('Every competitor must have a non-empty string "id"');
+      }
+      if (c.name !== void 0 && typeof c.name !== "string") {
+        errors.push(`Competitor "${String(c.id)}" has non-string name`);
+      }
+    }
+    if (errors.length > 0) {
+      return { valid: false, errors };
+    }
+    return { valid: true, errors: [] };
   }
 };
 
@@ -542,6 +681,71 @@ var DefaultByePlacementStrategy = class {
   }
 };
 
+// src/engine/claim-resolver.ts
+function resolvePlacementClaims(input, rules, fillOrder) {
+  const { competitors, generationContext, byePositions } = input;
+  const bracketSize = generationContext.bracketSize;
+  const positions = new Array(bracketSize).fill(null);
+  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
+  const claimedCompetitors = /* @__PURE__ */ new Set();
+  const claimedPositions = /* @__PURE__ */ new Set();
+  const acceptedClaims = [];
+  const baseInput = {
+    competitors,
+    generationContext,
+    positionMap: input.positionMap,
+    byePositions,
+    claimed: acceptedClaims
+  };
+  const sortedRules = [...rules].sort((a, b) => a.priority - b.priority);
+  for (const rule of sortedRules) {
+    const ruleClaims = rule.claim(baseInput);
+    for (const claim of ruleClaims) {
+      const { position, competitorId } = claim;
+      if (position < 0 || position >= bracketSize) continue;
+      if (claimedPositions.has(position)) continue;
+      if (competitorId === null) {
+        claimedPositions.add(position);
+        acceptedClaims.push(claim);
+        continue;
+      }
+      if (claimedCompetitors.has(competitorId)) continue;
+      const competitor = competitorMap.get(competitorId);
+      if (!competitor) continue;
+      positions[position] = competitor;
+      claimedCompetitors.add(competitorId);
+      claimedPositions.add(position);
+      acceptedClaims.push(claim);
+    }
+  }
+  for (const competitor of fillOrder) {
+    if (claimedCompetitors.has(competitor.id)) continue;
+    for (let pos = 0; pos < bracketSize; pos++) {
+      if (!claimedPositions.has(pos)) {
+        positions[pos] = competitor;
+        claimedCompetitors.add(competitor.id);
+        claimedPositions.add(pos);
+        break;
+      }
+    }
+  }
+  return positions;
+}
+
+// src/engine/placement-claim.ts
+var PlacementPriority = {
+  /** Manual placements — highest priority. */
+  manual: 1,
+  /** Placement filters (Province / Club / Coach / Country). */
+  filter: 2,
+  /** Tournament seeding (official seeded positions). */
+  seed: 3,
+  /** BYE reservations. */
+  bye: 4,
+  /** Fill remaining competitors. */
+  fill: 5
+};
+
 // src/single-elimination/seeding.ts
 function standardSeeding(bracketSize) {
   if (bracketSize < 2) return [];
@@ -555,89 +759,205 @@ function standardSeeding(bracketSize) {
   return result;
 }
 
-// src/single-elimination/default-competitor-placement.ts
-var DefaultCompetitorPlacementStrategy = class {
-  placeCompetitors(input) {
-    const {
-      competitors,
-      generationContext,
-      byePositions,
-      drawType,
-      manualPlacements
-    } = input;
-    if (manualPlacements && manualPlacements.size > 0) {
-      return placeSuppliedCompetitors(
-        competitors,
-        generationContext.bracketSize,
-        byePositions,
-        manualPlacements
-      );
+// src/single-elimination/seed-placement.ts
+function computeSeedClaims(competitors, bracketSize, byePositions) {
+  const seeding = standardSeeding(bracketSize);
+  const byeSet = byePositions ?? new Set(calculateByeDistribution(competitors.length).byePositions);
+  const claimedSeeds = /* @__PURE__ */ new Set();
+  const seedClaims = [];
+  for (const competitor of competitors) {
+    const { seed } = competitor;
+    if (seed === null || seed < 1 || seed > bracketSize) continue;
+    if (claimedSeeds.has(seed)) continue;
+    const standardPosition = seeding.indexOf(seed);
+    if (standardPosition === -1) continue;
+    claimedSeeds.add(seed);
+    seedClaims.push({
+      seed,
+      position: byeSet.has(standardPosition) ? standardPosition ^ 1 : standardPosition,
+      competitorId: competitor.id
+    });
+  }
+  seedClaims.sort((a, b) => a.seed - b.seed);
+  guaranteeTopRecipients(seedClaims, byeSet, bracketSize);
+  const claims = seedClaims.map(({ position, competitorId }) => ({
+    position,
+    competitorId,
+    source: "seeding"
+  }));
+  return claims;
+}
+function guaranteeTopRecipients(claims, byeSet, bracketSize) {
+  const byeOrder = generateByePriorityPositions(bracketSize).filter(
+    (pos) => byeSet.has(pos)
+  );
+  const guaranteedCount = Math.min(byeOrder.length, claims.length);
+  for (let i = 0; i < guaranteedCount; i++) {
+    const claim = claims[i];
+    const target = byeOrder[i] ^ 1;
+    if (claim.position === target) continue;
+    const occupant = claims.find(
+      (c) => c.position === target && c.seed > claim.seed
+    );
+    if (occupant) {
+      occupant.position = claim.position;
     }
-    const seeding = standardSeeding(generationContext.bracketSize);
-    let ordered;
-    if (drawType === "random") {
-      ordered = shuffleArray(competitors);
-    } else {
-      ordered = competitors;
-    }
-    const seedMap = /* @__PURE__ */ new Map();
-    const unseeded = [];
-    for (const c of ordered) {
-      if (c.seed !== null && c.seed >= 1 && c.seed <= generationContext.bracketSize && !seedMap.has(c.seed)) {
-        seedMap.set(c.seed, c);
-      } else {
-        unseeded.push(c);
-      }
-    }
-    const positions = new Array(
-      generationContext.bracketSize
-    ).fill(null);
+    claim.position = target;
+  }
+}
+var DefaultSeedPlacementStrategy = class {
+  constructor() {
+    this.name = "seeding";
+    this.priority = PlacementPriority.seed;
+  }
+  placeSeeds(input) {
+    return computeSeedClaims(
+      input.competitors,
+      input.generationContext.bracketSize,
+      input.byePositions
+    );
+  }
+  claim(input) {
+    return this.placeSeeds(input);
+  }
+};
+
+// src/single-elimination/placement-rules.ts
+var ManualPlacementRule = class {
+  constructor(manualPlacements) {
+    this.manualPlacements = manualPlacements;
+    this.name = "manual";
+    this.priority = PlacementPriority.manual;
+  }
+  claim(input) {
+    const { competitors, generationContext, byePositions } = input;
+    const bracketSize = generationContext.bracketSize;
+    const knownIds = new Set(competitors.map((c) => c.id));
     const nonByePositions = [];
-    for (let pos = 0; pos < generationContext.bracketSize; pos++) {
+    for (let pos = 0; pos < bracketSize; pos++) {
       if (!byePositions.has(pos)) {
         nonByePositions.push(pos);
       }
     }
+    const orderedEntries = [...this.manualPlacements.entries()].filter(([pos]) => pos >= 0 && pos < bracketSize).sort((a, b) => a[0] - b[0]);
+    const claims = [];
+    const claimedCompetitors = /* @__PURE__ */ new Set();
     let placeIdx = 0;
-    for (const seed of seeding) {
+    for (const [, competitorId] of orderedEntries) {
+      if (!knownIds.has(competitorId) || claimedCompetitors.has(competitorId)) continue;
       if (placeIdx >= nonByePositions.length) break;
-      const competitor = seedMap.get(seed);
-      if (competitor) {
-        positions[nonByePositions[placeIdx]] = competitor;
-        placeIdx++;
-      }
+      claims.push({
+        position: nonByePositions[placeIdx],
+        competitorId,
+        source: this.name
+      });
+      claimedCompetitors.add(competitorId);
+      placeIdx++;
     }
-    for (let i = placeIdx; i < nonByePositions.length && unseeded.length > 0; i++) {
-      positions[nonByePositions[i]] = unseeded.shift();
-    }
-    return positions;
+    return claims;
   }
 };
-function placeSuppliedCompetitors(competitors, bracketSize, byePositions, manualPlacements) {
-  const positions = new Array(bracketSize).fill(null);
-  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
-  const nonByePositions = [];
-  for (let pos = 0; pos < bracketSize; pos++) {
-    if (!byePositions.has(pos)) {
-      nonByePositions.push(pos);
+var FilterPlacementRule = class {
+  constructor(filter) {
+    this.filter = filter;
+    this.priority = PlacementPriority.filter;
+  }
+  get name() {
+    return this.filter.name;
+  }
+  claim(input) {
+    return this.filter.apply(input, input.claimed);
+  }
+};
+var SeedPlacementRule = class {
+  constructor(strategy, drawType, manualPlacements) {
+    this.strategy = strategy;
+    this.drawType = drawType;
+    this.manualPlacements = manualPlacements;
+    this.priority = PlacementPriority.seed;
+  }
+  get name() {
+    return this.strategy.name;
+  }
+  claim(input) {
+    const seedInput = {
+      ...input,
+      drawType: this.drawType,
+      manualPlacements: this.manualPlacements
+    };
+    return this.strategy.placeSeeds(seedInput);
+  }
+};
+var ByePlacementRule = class {
+  constructor() {
+    this.name = "bye";
+    this.priority = PlacementPriority.bye;
+  }
+  claim(input) {
+    return [...input.byePositions].sort((a, b) => a - b).map((position) => ({ position, competitorId: null, source: this.name }));
+  }
+};
+
+// src/single-elimination/default-competitor-placement.ts
+var DefaultCompetitorPlacementStrategy = class {
+  constructor(config = {}) {
+    this.seedStrategy = config.seedPlacement ?? new DefaultSeedPlacementStrategy();
+    this.filters = config.filters ?? [];
+  }
+  placeCompetitors(input) {
+    const {
+      competitors,
+      generationContext,
+      positionMap,
+      byePositions,
+      drawType,
+      manualPlacements,
+      placementOrder
+    } = input;
+    const rules = [];
+    if (manualPlacements && manualPlacements.size > 0) {
+      rules.push(new ManualPlacementRule(manualPlacements));
+    }
+    for (const filter of this.filters) {
+      rules.push(new FilterPlacementRule(filter));
+    }
+    rules.push(new SeedPlacementRule(this.seedStrategy, drawType, manualPlacements));
+    rules.push(new ByePlacementRule());
+    const fillOrder = buildFillOrder(
+      competitors,
+      drawType,
+      placementOrder
+    );
+    return resolvePlacementClaims(
+      {
+        competitors,
+        generationContext,
+        positionMap,
+        byePositions,
+        claimed: []
+      },
+      rules,
+      fillOrder
+    );
+  }
+};
+function buildFillOrder(competitors, drawType, placementOrder) {
+  if (placementOrder) {
+    const byId = new Map(competitors.map((competitor) => [competitor.id, competitor]));
+    const seen = /* @__PURE__ */ new Set();
+    const order = [];
+    for (const id of placementOrder) {
+      const competitor = byId.get(id);
+      if (competitor && !seen.has(id)) {
+        seen.add(id);
+        order.push(competitor);
+      }
+    }
+    if (order.length > 0) {
+      return order;
     }
   }
-  const orderedEntries = [...manualPlacements.entries()].filter(([pos]) => pos >= 0 && pos < bracketSize).sort((a, b) => a[0] - b[0]);
-  const placedIds = /* @__PURE__ */ new Set();
-  let placeIdx = 0;
-  for (const [, competitorId] of orderedEntries) {
-    const competitor = competitorMap.get(competitorId);
-    if (!competitor || placedIds.has(competitor.id)) continue;
-    if (placeIdx >= nonByePositions.length) break;
-    positions[nonByePositions[placeIdx]] = competitor;
-    placedIds.add(competitor.id);
-    placeIdx++;
-  }
-  const unplaced = competitors.filter((c) => !placedIds.has(c.id));
-  for (let i = placeIdx; i < nonByePositions.length && unplaced.length > 0; i++) {
-    positions[nonByePositions[i]] = unplaced.shift();
-  }
-  return positions;
+  return drawType === "random" ? shuffleArray(competitors) : competitors;
 }
 
 // src/single-elimination/generation-steps.ts
@@ -669,7 +989,8 @@ function createCompetitorPlacementStep(strategy) {
         positionMap: context.positionMap,
         byePositions: context.byePositions,
         drawType: context.drawType,
-        manualPlacements: context.manualPlacements
+        manualPlacements: context.manualPlacements,
+        placementOrder: context.placementOrder
       });
       return { ...context, placements };
     }
@@ -759,14 +1080,28 @@ var SINGLE_ELIMINATION_STEPS = createSingleEliminationSteps(new DefaultByePlacem
 
 // src/single-elimination/generator.ts
 var pipeline = new GenerationPipeline(SINGLE_ELIMINATION_STEPS);
-function generateBracket(competitors, drawType = "random", manualPlacements) {
+function generateBracket(competitors, drawType = "random", manualPlacements, placementOrder) {
   if (competitors.length < 2) {
     throw new Error("At least 2 competitors are required to generate a bracket");
   }
   if (competitors.length > 256) {
     throw new Error("Maximum 256 competitors allowed");
   }
-  const ctx = createPipelineContext(competitors, drawType, manualPlacements);
+  const seedErrors = validateSeeds({
+    competitors,
+    drawType,
+    manualPlacements,
+    placementOrder
+  });
+  if (seedErrors.length > 0) {
+    throw new Error(seedErrors.join("; "));
+  }
+  const ctx = createPipelineContext(
+    competitors,
+    drawType,
+    manualPlacements,
+    placementOrder
+  );
   const result = pipeline.run(ctx);
   return { bracket: result.bracket, byes: result.byes };
 }
@@ -879,16 +1214,17 @@ var SingleEliminationStrategy = class {
     this.format = "single-elimination";
     this.name = "Single Elimination";
     this.byeStrategy = config?.byePlacement ?? new DefaultByePlacementStrategy();
-    this.competitorStrategy = config?.competitorPlacement ?? new DefaultCompetitorPlacementStrategy();
+    this.competitorStrategy = buildCompetitorStrategy(config);
     this.pipeline = new GenerationPipeline(
       createSingleEliminationSteps(this.byeStrategy, this.competitorStrategy)
     );
   }
-  generate(competitors, drawType, manualPlacements, context) {
+  generate(competitors, drawType, manualPlacements, placementOrder, context) {
     const pipelineContext = createPipelineContext(
       competitors,
       drawType,
       manualPlacements,
+      placementOrder,
       context
     );
     const result = this.pipeline.run(pipelineContext);
@@ -913,6 +1249,15 @@ var SingleEliminationStrategy = class {
     return getBracketPreview(competitorCount, seeds);
   }
 };
+function buildCompetitorStrategy(config) {
+  if (config?.competitorPlacement) {
+    return config.competitorPlacement;
+  }
+  return new DefaultCompetitorPlacementStrategy({
+    seedPlacement: config?.seedPlacement,
+    filters: config?.filters
+  });
+}
 
 // src/single-elimination/balanced-bye-placement.ts
 function distribute(size, byeCount) {
@@ -995,14 +1340,20 @@ var TournamentEngine = class {
    * @throws If fewer than 2 competitors are provided (strategy-level).
    * @throws If more than 128 competitors are provided (strategy-level).
    */
-  generate(competitors, drawType, manualPlacements) {
-    const input = { competitors, drawType, manualPlacements };
+  generate(competitors, drawType, manualPlacements, placementOrder) {
+    const input = { competitors, drawType, manualPlacements, placementOrder };
     const validation = this.generatePipeline.run(input);
     if (!validation.valid) {
       throw new ValidationError(validation.errors);
     }
     const context = buildGenerationContext(competitors);
-    return this.strategy.generate(competitors, drawType, manualPlacements, context);
+    return this.strategy.generate(
+      competitors,
+      drawType,
+      manualPlacements,
+      placementOrder,
+      context
+    );
   }
   /**
    * Resolve a match by declaring a winner.
@@ -1049,74 +1400,6 @@ var TournamentEngine = class {
   }
 };
 
-// src/engine/validators/generate.ts
-var MinimumCompetitorsValidator = class {
-  validate(input) {
-    if (input.competitors.length < 2) {
-      return { valid: false, errors: ["At least 2 competitors are required"] };
-    }
-    return { valid: true, errors: [] };
-  }
-};
-var MaximumCompetitorsValidator = class {
-  validate(input) {
-    if (input.competitors.length > 256) {
-      return { valid: false, errors: ["Maximum 256 competitors allowed"] };
-    }
-    return { valid: true, errors: [] };
-  }
-};
-var UniqueIdsValidator = class {
-  validate(input) {
-    const seen = /* @__PURE__ */ new Set();
-    const duplicates = [];
-    for (const c of input.competitors) {
-      if (seen.has(c.id)) {
-        duplicates.push(c.id);
-      }
-      seen.add(c.id);
-    }
-    if (duplicates.length > 0) {
-      return {
-        valid: false,
-        errors: [`Duplicate competitor IDs: ${[...new Set(duplicates)].join(", ")}`]
-      };
-    }
-    return { valid: true, errors: [] };
-  }
-};
-var NonEmptyNamesValidator = class {
-  validate(input) {
-    const errors = [];
-    for (const c of input.competitors) {
-      if (typeof c.name !== "string" || c.name.trim() === "") {
-        errors.push(`Competitor "${c.id}" has empty or missing name`);
-      }
-    }
-    if (errors.length > 0) {
-      return { valid: false, errors };
-    }
-    return { valid: true, errors: [] };
-  }
-};
-var RequiredFieldsValidator = class {
-  validate(input) {
-    const errors = [];
-    for (const c of input.competitors) {
-      if (typeof c.id !== "string" || c.id === "") {
-        errors.push('Every competitor must have a non-empty string "id"');
-      }
-      if (c.name !== void 0 && typeof c.name !== "string") {
-        errors.push(`Competitor "${String(c.id)}" has non-string name`);
-      }
-    }
-    if (errors.length > 0) {
-      return { valid: false, errors };
-    }
-    return { valid: true, errors: [] };
-  }
-};
-
 // src/engine/validators/resolve.ts
 var NonEmptyMatchIdValidator = class {
   validate(input) {
@@ -1142,7 +1425,10 @@ function defaultGenerateValidators() {
     new MinimumCompetitorsValidator(),
     new MaximumCompetitorsValidator(),
     new UniqueIdsValidator(),
-    new NonEmptyNamesValidator()
+    new NonEmptyNamesValidator(),
+    new DuplicateSeedsValidator(),
+    new InvalidSeedValuesValidator(),
+    new SeededCountValidator()
   ];
 }
 function defaultResolveValidators() {
@@ -1153,15 +1439,23 @@ function defaultResolveValidators() {
 }
 export {
   BalancedByePlacementStrategy,
+  ByePlacementRule,
   DefaultByePlacementStrategy,
   DefaultCompetitorPlacementStrategy,
+  DefaultSeedPlacementStrategy,
+  DuplicateSeedsValidator,
+  FilterPlacementRule,
   GenerationPipeline,
+  InvalidSeedValuesValidator,
+  ManualPlacementRule,
   MaximumCompetitorsValidator,
   MinimumCompetitorsValidator,
   NonEmptyMatchIdValidator,
   NonEmptyNamesValidator,
   NonEmptyWinnerIdValidator,
   RequiredFieldsValidator,
+  SeedPlacementRule,
+  SeededCountValidator,
   SingleEliminationStrategy,
   TournamentEngine,
   UniqueIdsValidator,
@@ -1169,6 +1463,7 @@ export {
   ValidationPipeline,
   buildGenerationContext,
   cascadeUndo,
+  computeSeedClaims,
   createPipelineContext,
   defaultGenerateValidators,
   defaultResolveValidators,
@@ -1177,6 +1472,8 @@ export {
   getBracketPreview,
   getChampion,
   isBracketComplete,
-  resolveMatch
+  resolveMatch,
+  resolvePlacementClaims,
+  validateSeeds
 };
 //# sourceMappingURL=index.mjs.map

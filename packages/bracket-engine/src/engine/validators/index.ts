@@ -5,6 +5,10 @@ import {
   UniqueIdsValidator,
   NonEmptyNamesValidator,
   RequiredFieldsValidator,
+  DuplicateSeedsValidator,
+  InvalidSeedValuesValidator,
+  SeededCountValidator,
+  validateSeeds,
 } from './generate';
 import {
   NonEmptyMatchIdValidator,
@@ -17,6 +21,10 @@ export {
   UniqueIdsValidator,
   NonEmptyNamesValidator,
   RequiredFieldsValidator,
+  DuplicateSeedsValidator,
+  InvalidSeedValuesValidator,
+  SeededCountValidator,
+  validateSeeds,
 } from './generate';
 
 export {
@@ -41,6 +49,9 @@ export function defaultGenerateValidators(): readonly Validator<GenerateInput>[]
     new MaximumCompetitorsValidator(),
     new UniqueIdsValidator(),
     new NonEmptyNamesValidator(),
+    new DuplicateSeedsValidator(),
+    new InvalidSeedValuesValidator(),
+    new SeededCountValidator(),
   ];
 }
 

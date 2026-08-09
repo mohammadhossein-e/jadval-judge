@@ -35,6 +35,12 @@ export interface TournamentStrategy {
    * When `manualPlacements` is provided and non-empty, it takes priority
    * over `drawType`.
    *
+   * `placementOrder` is the ordered competitor ids produced by a random
+   * draw. It is a placement ORDER only — it never creates placement
+   * claims. It defines the order in which remaining competitors fill
+   * free positions after manual, filters, seeds, and BYE reservations
+   * are resolved.
+   *
    * @throws If fewer than 2 competitors are provided.
    * @throws If more than 128 competitors are provided.
    */
@@ -42,6 +48,7 @@ export interface TournamentStrategy {
     competitors: readonly EngineCompetitor[],
     drawType: DrawType,
     manualPlacements?: Map<number, string>,
+    placementOrder?: readonly string[],
     context?: GenerationContext,
   ): GenerationResult;
 

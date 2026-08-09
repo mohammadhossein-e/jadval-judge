@@ -11,12 +11,26 @@ import {
 } from '@jadval/bracket-engine';
 import type { CompetitorInput } from '@/lib/draw';
 
+/**
+ * Input for bracket generation.
+ *
+ * - `placements` — true manual position-to-competitor mappings. These
+ *   become high-priority placement claims that override every other rule.
+ * - `placementOrder` — ordered competitor ids from a random draw. This is
+ *   a placement ORDER only: it never creates placement claims and only
+ *   defines the order in which remaining competitors fill free positions.
+ */
+export interface BracketGenerationInput {
+  readonly placements?: Map<number, string>;
+  readonly placementOrder?: readonly string[];
+}
+
 export interface UseBracketGenerationReturn {
   bracket: EngineBracket | null;
   byes: GenerationResult['byes'];
   isGenerated: boolean;
   preview: BracketPreview;
-  generate: (placements?: Map<number, string>) => EngineBracket;
+  generate: (input?: BracketGenerationInput) => EngineBracket;
   reset: () => void;
 }
 
@@ -49,8 +63,13 @@ export function useBracketGeneration(
   );
 
   const generate = useCallback(
-    (placements?: Map<number, string>): EngineBracket => {
-      const genResult = generateBracket(engineCompetitors, drawType, placements);
+    (input?: BracketGenerationInput): EngineBracket => {
+      const genResult = generateBracket(
+        engineCompetitors,
+        drawType,
+        input?.placements,
+        input?.placementOrder,
+      );
       setResult(genResult);
       return genResult.bracket;
     },

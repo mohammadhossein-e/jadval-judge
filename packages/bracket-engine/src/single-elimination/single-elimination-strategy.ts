@@ -9,6 +9,8 @@ import type { TournamentStrategy } from '../engine/tournament-strategy';
 import type { GenerationContext } from '../engine/generation-context';
 import type { ByePlacementStrategy } from '../engine/bye-placement-strategy';
 import type { CompetitorPlacementStrategy } from '../engine/competitor-placement-strategy';
+import type { PlacementFilter } from '../engine/placement-filter';
+import type { SeedPlacementStrategy } from '../engine/seed-placement-strategy';
 import {
   GenerationPipeline,
   createPipelineContext,
@@ -19,7 +21,9 @@ import { cascadeUndo } from './cascade';
 import { getBracketPreview } from './byes';
 import { createSingleEliminationSteps } from './generation-steps';
 import { DefaultByePlacementStrategy } from './default-bye-placement';
-import { DefaultCompetitorPlacementStrategy } from './default-competitor-placement';
+import {
+  DefaultCompetitorPlacementStrategy,
+} from './default-competitor-placement';
 
 /**
  * Configuration for {@link SingleEliminationStrategy}.
@@ -32,6 +36,20 @@ export interface SingleEliminationStrategyConfig {
   readonly byePlacement?: ByePlacementStrategy;
   /** Strategy for placing competitors into non-BYE positions. */
   readonly competitorPlacement?: CompetitorPlacementStrategy;
+  /**
+   * Seeding strategy (official seeded positions). Applied as an
+   * independent placement rule at the `seed` priority level and
+   * composed with the default competitor placement. Only used when
+   * `competitorPlacement` is not provided.
+   */
+  readonly seedPlacement?: SeedPlacementStrategy;
+  /**
+   * Placement filters (Province / Club / Coach / Country separation).
+   * Applied at the `filter` priority level after manual placements and
+   * before seeding. Only used when `competitorPlacement` is not
+   * provided.
+   */
+  readonly filters?: readonly PlacementFilter[];
 }
 
 /**
@@ -55,7 +73,7 @@ export class SingleEliminationStrategy implements TournamentStrategy {
 
   constructor(config?: SingleEliminationStrategyConfig) {
     this.byeStrategy = config?.byePlacement ?? new DefaultByePlacementStrategy();
-    this.competitorStrategy = config?.competitorPlacement ?? new DefaultCompetitorPlacementStrategy();
+    this.competitorStrategy = buildCompetitorStrategy(config);
     this.pipeline = new GenerationPipeline(
       createSingleEliminationSteps(this.byeStrategy, this.competitorStrategy),
     );
@@ -65,12 +83,14 @@ export class SingleEliminationStrategy implements TournamentStrategy {
     competitors: readonly EngineCompetitor[],
     drawType: DrawType,
     manualPlacements?: Map<number, string>,
+    placementOrder?: readonly string[],
     context?: GenerationContext,
   ): GenerationResult {
     const pipelineContext = createPipelineContext(
       competitors,
       drawType,
       manualPlacements,
+      placementOrder,
       context,
     );
     const result = this.pipeline.run(pipelineContext);
@@ -106,4 +126,24 @@ export class SingleEliminationStrategy implements TournamentStrategy {
   ): BracketPreview {
     return getBracketPreview(competitorCount, seeds);
   }
+}
+
+/**
+ * Build the competitor placement strategy from the injected config.
+ *
+ * An explicit `competitorPlacement` always wins. Otherwise the default
+ * strategy is configured with the optional seeding strategy and
+ * placement filters (which default to the official seeding behavior and
+ * no filters when omitted).
+ */
+function buildCompetitorStrategy(
+  config?: SingleEliminationStrategyConfig,
+): CompetitorPlacementStrategy {
+  if (config?.competitorPlacement) {
+    return config.competitorPlacement;
+  }
+  return new DefaultCompetitorPlacementStrategy({
+    seedPlacement: config?.seedPlacement,
+    filters: config?.filters,
+  });
 }

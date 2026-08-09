@@ -17,7 +17,7 @@ import { BulkAddDialog } from '@/components/competitor/BulkAddDialog';
 import { useBracketGeneration } from '@/hooks/useBracketGeneration';
 import { useMatchResolution } from '@/hooks/useMatchResolution';
 import {
-  drawEntriesToPlacements,
+  drawEntriesToOrder,
   manualSlotsToPlacements,
 } from '@/lib/draw';
 import { getRepository } from '@/lib/repositories';
@@ -206,24 +206,24 @@ export function CategoryCompetitorsManager({
       return;
     }
 
-    let placements: Map<number, string> | undefined;
+    let generateInput: { placements?: Map<number, string>; placementOrder?: string[] } = {};
 
     if (drawType === 'random') {
       if (!randomDrawStatus.hasDraw || !randomDrawStatus.drawResult) {
         toast.error('Perform a random draw first');
         return;
       }
-      placements = drawEntriesToPlacements(randomDrawStatus.drawResult);
+      generateInput = { placementOrder: drawEntriesToOrder(randomDrawStatus.drawResult) };
     } else {
       if (!manualDrawStatus.isComplete) {
         toast.error('Place all competitors before generating');
         return;
       }
-      placements = manualSlotsToPlacements(manualDrawStatus.slots);
+      generateInput = { placements: manualSlotsToPlacements(manualDrawStatus.slots) };
     }
 
     try {
-      const generatedBracket = generate(placements);
+      const generatedBracket = generate(generateInput);
       getRepository().saveBracket(categoryId, generatedBracket);
       toast.success('Bracket generated');
     } catch (err) {

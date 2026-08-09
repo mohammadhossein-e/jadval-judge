@@ -89,12 +89,12 @@ describe('getBracketPreview', () => {
     expect(seededPreview.seededByes).toEqual(unseededPreview.seededByes);
   });
 
-  it('preview BYE positions match the actual generated bracket', () => {
+  it('preview BYE positions match the actual generated bracket (unseeded draws)', () => {
     for (const count of [3, 5, 9, 13, 17]) {
       const competitors = Array.from({ length: count }, (_, i) => ({
         id: `c${i + 1}`,
         name: `Competitor ${i + 1}`,
-        seed: i + 1,
+        seed: null,
       }));
 
       const preview = getBracketPreview(count, competitors.map((c) => c.seed));
@@ -102,6 +102,21 @@ describe('getBracketPreview', () => {
       const actual = byes.map((b) => b.position).sort((a, b) => a - b);
 
       expect(preview.seededByes.slice().sort((a, b) => a - b)).toEqual(actual);
+    }
+  });
+
+  it('seeded draws keep the official BYE positions', () => {
+    for (const count of [3, 5, 9, 13, 17]) {
+      const competitors = Array.from({ length: count }, (_, i) => ({
+        id: `c${i + 1}`,
+        name: `Competitor ${i + 1}`,
+        seed: i + 1,
+      }));
+
+      const { byes } = generateBracket(competitors, 'manual');
+      const official = [...calculateByeDistribution(count).byePositions].sort((a, b) => a - b);
+      const actual = byes.map((b) => b.position).sort((a, b) => a - b);
+      expect(actual).toEqual(official);
     }
   });
 

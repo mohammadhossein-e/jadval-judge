@@ -350,8 +350,8 @@ describe('ValidationPipeline', () => {
 // ─── defaultGenerateValidators ──────────────────────────────────
 
 describe('defaultGenerateValidators', () => {
-  it('returns 5 validators', () => {
-    expect(defaultGenerateValidators()).toHaveLength(5);
+  it('returns 8 validators', () => {
+    expect(defaultGenerateValidators()).toHaveLength(8);
   });
 
   it('rejects empty input', () => {

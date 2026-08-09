@@ -5,6 +5,7 @@ import {
   getUnplacedCompetitors,
   validateManualPlacement,
   drawEntriesToPlacements,
+  drawEntriesToOrder,
   manualSlotsToPlacements,
   resolveSlots,
   resolveDrawEntries,
@@ -297,6 +298,22 @@ describe('drawEntriesToPlacements', () => {
   it('returns empty Map for empty array', () => {
     const result = drawEntriesToPlacements([]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe('drawEntriesToOrder', () => {
+  it('extracts competitor ids sorted by draw position', () => {
+    const entries: DrawEntry[] = [
+      { position: 3, competitorId: 'c3' },
+      { position: 1, competitorId: 'c1' },
+      { position: 2, competitorId: 'c2' },
+    ];
+    const result = drawEntriesToOrder(entries);
+    expect(result).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(drawEntriesToOrder([])).toEqual([]);
   });
 });
 

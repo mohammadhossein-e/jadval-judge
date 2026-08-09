@@ -110,6 +110,19 @@ export function drawEntriesToPlacements(entries: DrawEntry[]): Map<number, strin
   return placements;
 }
 
+/**
+ * Extracts the ordered competitor ids produced by a random draw.
+ *
+ * The returned order is a placement ORDER only — it never creates
+ * placement claims. The engine uses it to fill free positions after
+ * manual placements, filters, seeds, and BYE reservations are resolved.
+ */
+export function drawEntriesToOrder(entries: DrawEntry[]): string[] {
+  return [...entries]
+    .sort((a, b) => a.position - b.position)
+    .map((entry) => entry.competitorId);
+}
+
 export function syncSlots(
   competitors: readonly CompetitorInput[],
   currentSlots: ManualSlots,

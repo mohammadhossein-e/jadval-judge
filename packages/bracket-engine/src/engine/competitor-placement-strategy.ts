@@ -27,6 +27,15 @@ export interface PlacementInput {
 
   /** Manual position-to-competitor mappings (if applicable). */
   readonly manualPlacements?: Map<number, string>;
+
+  /**
+   * Ordered competitor ids produced by a random draw (if applicable).
+   * This is a placement ORDER only — it never creates placement claims.
+   * It defines the order in which remaining competitors fill free
+   * positions after manual, filters, seeds, and BYE reservations are
+   * resolved.
+   */
+  readonly placementOrder?: readonly string[];
 }
 
 /**

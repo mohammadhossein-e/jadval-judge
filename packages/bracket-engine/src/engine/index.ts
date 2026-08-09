@@ -10,6 +10,16 @@ export type { BracketSkeleton, SkeletonMatch } from './bracket-skeleton';
 export type { PositionEntry, PositionMap, PositionMapBuilder } from './position-map';
 export type { ByePlacementStrategy } from './bye-placement-strategy';
 export type { CompetitorPlacementStrategy, PlacementInput } from './competitor-placement-strategy';
+export type { PlacementFilter } from './placement-filter';
+export type {
+  PlacementClaim,
+  PlacementClaims,
+  PlacementPriority,
+  PlacementRule,
+  PlacementRuleInput,
+} from './placement-claim';
+export type { SeedPlacementInput, SeedPlacementStrategy } from './seed-placement-strategy';
+export { resolvePlacementClaims } from './claim-resolver';
 export type { PipelineContext, PipelineStep } from './pipeline';
 export { GenerationPipeline, createPipelineContext } from './pipeline';
 export {
@@ -18,6 +28,10 @@ export {
   UniqueIdsValidator,
   NonEmptyNamesValidator,
   RequiredFieldsValidator,
+  DuplicateSeedsValidator,
+  InvalidSeedValuesValidator,
+  SeededCountValidator,
+  validateSeeds,
   NonEmptyMatchIdValidator,
   NonEmptyWinnerIdValidator,
   defaultGenerateValidators,

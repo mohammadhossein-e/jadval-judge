@@ -1,146 +1,132 @@
-import type { EngineCompetitor } from '../types';
+import type { DrawType, EngineCompetitor } from '../types';
 import type {
   CompetitorPlacementStrategy,
   PlacementInput,
 } from '../engine/competitor-placement-strategy';
-import { standardSeeding } from './seeding';
+import type { PlacementFilter } from '../engine/placement-filter';
+import type { PlacementRule } from '../engine/placement-claim';
+import type { SeedPlacementStrategy } from '../engine/seed-placement-strategy';
+import { resolvePlacementClaims } from '../engine/claim-resolver';
 import { shuffleArray } from '../utils';
+import { DefaultSeedPlacementStrategy } from './seed-placement';
+import {
+  ByePlacementRule,
+  FilterPlacementRule,
+  ManualPlacementRule,
+  SeedPlacementRule,
+} from './placement-rules';
 
 /**
- * Standard competitor placement derived from {@link standardSeeding}.
+ * Optional strategy parts for {@link DefaultCompetitorPlacementStrategy}.
+ */
+export interface DefaultCompetitorPlacementConfig {
+  /** Seeding strategy. Defaults to official seeded positions. */
+  readonly seedPlacement?: SeedPlacementStrategy;
+  /** Placement filters (Province / Club / Coach / Country separation). */
+  readonly filters?: readonly PlacementFilter[];
+}
+
+/**
+ * Claim-based competitor placement for single elimination.
  *
- * Produces the same placement as the legacy engine:
+ * Nothing writes competitors into positions directly. Every rule
+ * ({@link PlacementRule}) produces claims which the claim resolver
+ * applies in the stable priority chain:
  *
- * - **Manual draws** — treats the supplied placements map as a draw
- *   order and places competitors into the non-BYE positions, never
- *   occupying an official BYE slot.
- * - **Seeded draws** — places seeded competitors at non-BYE positions
- *   in seeding order, then fills remaining slots with unseeded
- *   competitors.
- * - **Random draws** — shuffles the competitor list first, then applies
- *   the seeded logic with virtual seeds.
+ *   1. Manual placements (draw order → non-BYE slots)
+ *   2. Placement filters
+ *   3. Seeding (official seeded positions)
+ *   4. BYE reservations
+ *   5. Fill remaining competitors
  *
- * This preserves full backward compatibility.
+ * Seeding is an independent, injectable rule — NOT a draw type — so it
+ * composes with both random and manual draws. When no competitor has a
+ * real seed the fixed BYE behavior (and the previous task's regression
+ * tests) is preserved exactly: manual entries keep their draw order
+ * among non-BYE slots and the fill step never occupies a BYE slot.
  */
 export class DefaultCompetitorPlacementStrategy
   implements CompetitorPlacementStrategy
 {
+  private readonly seedStrategy: SeedPlacementStrategy;
+  private readonly filters: readonly PlacementFilter[];
+
+  constructor(config: DefaultCompetitorPlacementConfig = {}) {
+    this.seedStrategy = config.seedPlacement ?? new DefaultSeedPlacementStrategy();
+    this.filters = config.filters ?? [];
+  }
+
   placeCompetitors(input: PlacementInput): readonly (EngineCompetitor | null)[] {
     const {
       competitors,
       generationContext,
+      positionMap,
       byePositions,
       drawType,
       manualPlacements,
+      placementOrder,
     } = input;
 
+    const rules: PlacementRule[] = [];
+
     if (manualPlacements && manualPlacements.size > 0) {
-      return placeSuppliedCompetitors(
+      rules.push(new ManualPlacementRule(manualPlacements));
+    }
+    for (const filter of this.filters) {
+      rules.push(new FilterPlacementRule(filter));
+    }
+    rules.push(new SeedPlacementRule(this.seedStrategy, drawType, manualPlacements));
+    rules.push(new ByePlacementRule());
+
+    const fillOrder: readonly EngineCompetitor[] = buildFillOrder(
+      competitors,
+      drawType,
+      placementOrder,
+    );
+
+    return resolvePlacementClaims(
+      {
         competitors,
-        generationContext.bracketSize,
+        generationContext,
+        positionMap,
         byePositions,
-        manualPlacements,
-      );
-    }
-
-    const seeding = standardSeeding(generationContext.bracketSize);
-
-    let ordered: readonly EngineCompetitor[];
-    if (drawType === 'random') {
-      ordered = shuffleArray(competitors);
-    } else {
-      ordered = competitors;
-    }
-
-    const seedMap = new Map<number, EngineCompetitor>();
-    const unseeded: EngineCompetitor[] = [];
-    for (const c of ordered) {
-      if (
-        c.seed !== null &&
-        c.seed >= 1 &&
-        c.seed <= generationContext.bracketSize &&
-        !seedMap.has(c.seed)
-      ) {
-        seedMap.set(c.seed, c);
-      } else {
-        unseeded.push(c);
-      }
-    }
-
-    const positions: (EngineCompetitor | null)[] = new Array(
-      generationContext.bracketSize,
-    ).fill(null);
-
-    const nonByePositions: number[] = [];
-    for (let pos = 0; pos < generationContext.bracketSize; pos++) {
-      if (!byePositions.has(pos)) {
-        nonByePositions.push(pos);
-      }
-    }
-
-    let placeIdx = 0;
-    for (const seed of seeding) {
-      if (placeIdx >= nonByePositions.length) break;
-      const competitor = seedMap.get(seed);
-      if (competitor) {
-        positions[nonByePositions[placeIdx]] = competitor;
-        placeIdx++;
-      }
-    }
-
-    for (let i = placeIdx; i < nonByePositions.length && unseeded.length > 0; i++) {
-      positions[nonByePositions[i]] = unseeded.shift()!;
-    }
-
-    return positions;
+        claimed: [],
+      },
+      rules,
+      fillOrder,
+    );
   }
 }
 
 /**
- * Place competitors from a supplied placements map while respecting the
- * official BYE positions.
+ * Builds the order in which remaining competitors fill free positions
+ * after manual, filters, seeds, and BYE reservations are resolved.
  *
- * The supplied map is treated as a draw ORDER, not a literal slot
- * assignment: BYE slots are reserved, and the competitors are placed
- * into the remaining non-BYE positions in the order their positions
- * appear in the map (ascending). Any competitor missing from the map
- * fills leftover non-BYE slots afterward.
+ * When a `placementOrder` (the result of a random draw) is provided it is
+ * used as-is — it is a placement ORDER only and never creates placement
+ * claims. Unknown or duplicated ids are ignored. Otherwise it falls back to
+ * the existing behavior: a shuffle for random draws, the given order for
+ * manual draws.
  */
-function placeSuppliedCompetitors(
+function buildFillOrder(
   competitors: readonly EngineCompetitor[],
-  bracketSize: number,
-  byePositions: ReadonlySet<number>,
-  manualPlacements: ReadonlyMap<number, string>,
-): (EngineCompetitor | null)[] {
-  const positions: (EngineCompetitor | null)[] = new Array(bracketSize).fill(null);
-  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
-
-  const nonByePositions: number[] = [];
-  for (let pos = 0; pos < bracketSize; pos++) {
-    if (!byePositions.has(pos)) {
-      nonByePositions.push(pos);
+  drawType: DrawType,
+  placementOrder?: readonly string[],
+): readonly EngineCompetitor[] {
+  if (placementOrder) {
+    const byId = new Map(competitors.map((competitor) => [competitor.id, competitor]));
+    const seen = new Set<string>();
+    const order: EngineCompetitor[] = [];
+    for (const id of placementOrder) {
+      const competitor = byId.get(id);
+      if (competitor && !seen.has(id)) {
+        seen.add(id);
+        order.push(competitor);
+      }
+    }
+    if (order.length > 0) {
+      return order;
     }
   }
-
-  const orderedEntries = [...manualPlacements.entries()]
-    .filter(([pos]) => pos >= 0 && pos < bracketSize)
-    .sort((a, b) => a[0] - b[0]);
-
-  const placedIds = new Set<string>();
-  let placeIdx = 0;
-  for (const [, competitorId] of orderedEntries) {
-    const competitor = competitorMap.get(competitorId);
-    if (!competitor || placedIds.has(competitor.id)) continue;
-    if (placeIdx >= nonByePositions.length) break;
-    positions[nonByePositions[placeIdx]] = competitor;
-    placedIds.add(competitor.id);
-    placeIdx++;
-  }
-
-  const unplaced = competitors.filter((c) => !placedIds.has(c.id));
-  for (let i = placeIdx; i < nonByePositions.length && unplaced.length > 0; i++) {
-    positions[nonByePositions[i]] = unplaced.shift()!;
-  }
-
-  return positions;
+  return drawType === 'random' ? shuffleArray(competitors) : competitors;
 }

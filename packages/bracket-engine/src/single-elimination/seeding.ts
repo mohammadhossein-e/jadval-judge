@@ -1,5 +1,7 @@
 import type { EngineCompetitor, DrawType } from '../types';
 import { shuffleArray } from '../utils';
+import { computeSeedClaims } from './seed-placement';
+import { calculateByeDistribution } from './bye-distribution';
 
 export function standardSeeding(bracketSize: number): number[] {
   if (bracketSize < 2) return [];
@@ -32,30 +34,29 @@ function seededPlacement(
   competitors: readonly EngineCompetitor[],
   bracketSize: number,
 ): (EngineCompetitor | null)[] {
-  const seeding = standardSeeding(bracketSize);
-  const seedMap = new Map<number, EngineCompetitor>();
-  const claimedSeeds = new Set<number>();
-  const unseeded: EngineCompetitor[] = [];
-
-  for (const c of competitors) {
-    if (c.seed !== null && c.seed >= 1 && c.seed <= bracketSize && !claimedSeeds.has(c.seed)) {
-      seedMap.set(c.seed, c);
-      claimedSeeds.add(c.seed);
-    } else {
-      unseeded.push(c);
-    }
-  }
-
+  const claims = computeSeedClaims(competitors, bracketSize);
+  const byeSet = new Set(
+    calculateByeDistribution(competitors.length).byePositions,
+  );
   const positions: (EngineCompetitor | null)[] = new Array(bracketSize).fill(null);
-  for (let pos = 0; pos < bracketSize; pos++) {
-    const competitor = seedMap.get(seeding[pos]);
-    if (competitor) {
-      positions[pos] = competitor;
-    }
+  const competitorMap = new Map(competitors.map((c) => [c.id, c]));
+  const placedIds = new Set<string>();
+  const occupied = new Set<number>();
+
+  for (const claim of claims) {
+    const competitor = claim.competitorId !== null ? competitorMap.get(claim.competitorId) : undefined;
+    if (!competitor) continue;
+    if (occupied.has(claim.position)) continue;
+    if (placedIds.has(competitor.id)) continue;
+    positions[claim.position] = competitor;
+    placedIds.add(competitor.id);
+    occupied.add(claim.position);
   }
 
+  const unseeded = competitors.filter((c) => !placedIds.has(c.id));
   let idx = 0;
   for (let pos = 0; pos < bracketSize; pos++) {
+    if (byeSet.has(pos)) continue;
     if (positions[pos] === null && idx < unseeded.length) {
       positions[pos] = unseeded[idx++];
     }

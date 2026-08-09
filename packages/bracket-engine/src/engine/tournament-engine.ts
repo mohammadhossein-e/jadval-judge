@@ -93,14 +93,21 @@ export class TournamentEngine {
     competitors: readonly EngineCompetitor[],
     drawType: DrawType,
     manualPlacements?: Map<number, string>,
+    placementOrder?: readonly string[],
   ): GenerationResult {
-    const input: GenerateInput = { competitors, drawType, manualPlacements };
+    const input: GenerateInput = { competitors, drawType, manualPlacements, placementOrder };
     const validation = this.generatePipeline.run(input);
     if (!validation.valid) {
       throw new ValidationError(validation.errors);
     }
     const context = buildGenerationContext(competitors);
-    return this.strategy.generate(competitors, drawType, manualPlacements, context);
+    return this.strategy.generate(
+      competitors,
+      drawType,
+      manualPlacements,
+      placementOrder,
+      context,
+    );
   }
 
   /**

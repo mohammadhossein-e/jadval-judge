@@ -34,6 +34,15 @@ export interface PipelineContext {
   /** Optional manual placements (immutable input). */
   readonly manualPlacements?: Map<number, string>;
 
+  /**
+   * Optional ordered competitor ids (immutable input) produced by a
+   * random draw. This is a placement ORDER only — it never creates
+   * placement claims. It defines the order in which remaining
+   * competitors fill free positions after manual, filters, seeds,
+   * and BYE reservations are resolved.
+   */
+  readonly placementOrder?: readonly string[];
+
   /** Pre-computed format-independent values. */
   readonly generationContext: GenerationContext;
 
@@ -67,12 +76,14 @@ export function createPipelineContext(
   competitors: readonly EngineCompetitor[],
   drawType: DrawType,
   manualPlacements?: Map<number, string>,
+  placementOrder?: readonly string[],
   context?: GenerationContext,
 ): PipelineContext {
   return {
     competitors,
     drawType,
     manualPlacements,
+    placementOrder,
     generationContext: context ?? buildGenerationContext(competitors),
     skeleton: null,
     positionMap: null,
